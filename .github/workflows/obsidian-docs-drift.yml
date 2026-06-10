@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 jobs:
@@ -27,6 +27,23 @@ jobs:
         id: docs
         run: node scripts/check-obsidian-docs.mjs
 
+      - name: Update committed snapshots
+        if: steps.docs.outputs.changed == 'true'
+        run: node scripts/check-obsidian-docs.mjs --update
+
+      - name: Commit updated snapshots
+        if: steps.docs.outputs.changed == 'true'
+        id: commit
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update Obsidian Bases docs snapshots"
+          branch: obsidian-docs-snapshots
+          create_branch: true
+          file_pattern: docs/upstream/obsidian-help/*.md
+          commit_user_name: github-actions[bot]
+          commit_user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          commit_author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+
       - name: Upload drift report
         if: steps.docs.outputs.changed == 'true'
         uses: actions/upload-artifact@v4
@@ -45,7 +62,21 @@ jobs:
             const labels = ["upstream-docs", "compatibility", "needs-review"];
             const report = fs.readFileSync(".tmp/obsidian-docs-drift/report.md", "utf8");
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const body = `${report}\n\nWorkflow run: ${runUrl}\n`;
+            const branch = "obsidian-docs-snapshots";
+            const commitHash = "${{ steps.commit.outputs.commit_hash }}";
+            const commitUrl = commitHash
+              ? `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/commit/${commitHash}`
+              : null;
+            const compareUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/compare/${context.ref.replace("refs/heads/", "")}...${branch}`;
+            const snapshotUpdate = [
+              "## Snapshot update",
+              "",
+              `Branch: \`${branch}\``,
+              commitUrl ? `Commit: ${commitUrl}` : "Commit: not created; check the workflow logs",
+              `Compare: ${compareUrl}`,
+              "",
+            ].join("\n");
+            const body = `${report}\n${snapshotUpdate}\nWorkflow run: ${runUrl}\n`;
 
             for (const name of labels) {
               try {

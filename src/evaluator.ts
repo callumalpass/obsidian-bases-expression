@@ -31,12 +31,13 @@ import {
 
 export interface EvaluationContext {
   note?: Record<string, unknown>;
+  objects?: Record<string, unknown>;
   file?: Partial<FileValueInput> & { path?: string };
   thisFile?: Partial<FileValueInput> & { path?: string };
   files?: FileValueInput[];
   linkResolutions?: Record<string, string | null>;
   formulas?: Record<string, string | Expression>;
-  propertyTypes?: Record<string, "date" | "string" | "number" | "boolean" | "list" | "object">;
+  propertyTypes?: Record<string, "date" | "string" | "number" | "boolean" | "list" | "object" | "link">;
   now?: Date | string | number;
   random?: () => number;
   functions?: Record<string, (...args: RuntimeValue[]) => RuntimeValue>;
@@ -110,6 +111,8 @@ export class Evaluator {
     if (name === "this") return objectValue({ file: this.fileObject(this.context.thisFile ?? this.context.file) });
     if (name === "formula") return objectValue({});
     if (name === "values") return this.noteProperty("values");
+    const objects = this.context.objects ?? {};
+    if (Object.prototype.hasOwnProperty.call(objects, name)) return fromJs(objects[name]);
     const note = this.context.note ?? {};
     if (Object.prototype.hasOwnProperty.call(note, name)) return this.noteProperty(name);
     return nullValue();
@@ -392,7 +395,7 @@ export class Evaluator {
       case "unique": {
         const seen = new Set<string>();
         return listValue(values.filter((value) => {
-          const key = JSON.stringify(toPlain(value));
+          const key = this.uniqueKey(value);
           if (seen.has(key)) return false;
           seen.add(key);
           return true;
@@ -545,6 +548,10 @@ export class Evaluator {
 
   private noteProperty(name: string): RuntimeValue {
     const raw = this.context.note?.[name];
+    if (this.context.propertyTypes?.[name] === "link") {
+      const value = fromJs(raw);
+      return value.type === "Link" ? value : this.makeLink(stringifyValue(value));
+    }
     return fromJs(raw, this.context.propertyTypes?.[name]);
   }
 
@@ -592,7 +599,25 @@ export class Evaluator {
   private findFileByLinkTarget(target: string): FileValueInput | undefined {
     const files = this.context.files ?? [];
     const normalizedTarget = normalizePath(target);
-    return files.find((file) => normalizePath(file.path) === normalizedTarget) ?? files.find((file) => normalizePath(file.path) === normalizePath(ensureMarkdownExtension(target))) ?? files.find((file) => normalizePath(file.path).endsWith(`/${normalizePath(ensureMarkdownExtension(target))}`)) ?? files.find((file) => file.basename === target || withoutMarkdownExtension(file.name ?? "") === target);
+    const markdownTarget = normalizePath(ensureMarkdownExtension(target));
+    const basenameTarget = withoutMarkdownExtension(target);
+    const normalizedTargetLower = normalizedTarget.toLowerCase();
+    const markdownTargetLower = markdownTarget.toLowerCase();
+    const basenameTargetLower = basenameTarget.toLowerCase();
+    return (
+      files.find((file) => normalizePath(file.path) === normalizedTarget) ??
+      files.find((file) => normalizePath(file.path) === markdownTarget) ??
+      files.find((file) => normalizePath(file.path).endsWith(`/${markdownTarget}`)) ??
+      files.find((file) => file.basename === target || withoutMarkdownExtension(file.name ?? "") === target) ??
+      files.find((file) => normalizePath(file.path).toLowerCase() === normalizedTargetLower) ??
+      files.find((file) => normalizePath(file.path).toLowerCase() === markdownTargetLower) ??
+      files.find((file) => normalizePath(file.path).toLowerCase().endsWith(`/${markdownTargetLower}`)) ??
+      files.find(
+        (file) =>
+          (file.basename ?? "").toLowerCase() === basenameTargetLower ||
+          withoutMarkdownExtension(file.name ?? "").toLowerCase() === basenameTargetLower,
+      )
+    );
   }
 
   private linkMatchesTarget(link: LinkValue, target: RuntimeValue): boolean {
@@ -654,6 +679,10 @@ export class Evaluator {
   private linkResolvedPath(link: LinkValue): string | null {
     const resolved = link.resolvedPath ?? this.resolveLinkPath(link.path);
     return resolved === undefined ? stripLinkSubpath(link.path) : resolved;
+  }
+
+  private uniqueKey(value: RuntimeValue): string {
+    return value.type === "Link" ? stringifyValue(value) : JSON.stringify(toPlain(value));
   }
 
   private compare(left: RuntimeValue, right: RuntimeValue, op: string): boolean {

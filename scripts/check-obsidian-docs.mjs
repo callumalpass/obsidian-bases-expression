@@ -128,7 +128,7 @@ function writeReport(allDocs, changedDocs) {
     "- Decide whether the expression spec or compatibility notes need updating.",
     "- Run `npm run oracle:generate` in a local Obsidian test vault if the docs change may affect runtime behavior.",
     "- Run `npm run verify` after updating fixtures or implementation behavior.",
-    "- Refresh committed snapshots with `npm run docs:upstream:update` once the change has been reviewed.",
+    "- Review and merge the auto-committed snapshot update once the change has been triaged.",
     "",
   ].join("\n");
 

@@ -205,25 +205,78 @@ const cases = [
   { name: "file size", expression: "file.size" },
   { name: "file properties price", expression: "file.properties.price" },
   { name: "file tags contains", expression: 'file.tags.contains("project/a")' },
+  { name: "frontmatter wikilink raw target", expression: "frontWiki" },
+  { name: "frontmatter wikilink to string", expression: "frontWiki.toString()" },
+  { name: "frontmatter wikilink is link", expression: 'frontWiki.isType("link")' },
+  { name: "frontmatter wikilink as file", expression: "frontWiki.asFile().path" },
+  { name: "frontmatter wikilink list length", expression: "frontList.length" },
+  { name: "frontmatter wikilink list strings", expression: "frontList.map(value.toString())" },
+  { name: "frontmatter wikilink list first is link", expression: 'frontList[0].isType("link")' },
+  { name: "frontmatter wikilink list first as file", expression: "frontList[0].asFile().path" },
+  { name: "frontmatter markdown list item remains string", expression: 'frontList[1].isType("string")' },
+  { name: "frontmatter markdown property remains string", expression: 'frontMd.isType("string")' },
+  { name: "frontmatter markdown property stringifies", expression: "frontMd.toString()" },
   { name: "file links length", expression: "file.links.length" },
   { name: "file links rendered matrix", expression: "file.links.map(value.toString())" },
   { name: "file links as files matrix", expression: "file.links.map(value.asFile().path)" },
-  { name: "file ordinary wikilink rendered", expression: "file.links[0].toString()" },
-  { name: "file alias wikilink rendered", expression: "file.links[1].toString()" },
-  { name: "file heading wikilink rendered", expression: "file.links[2].toString()" },
-  { name: "file block wikilink rendered", expression: "file.links[3].toString()" },
-  { name: "file duplicate wikilink resolves", expression: "file.links[4].asFile().path" },
-  { name: "file full path duplicate resolves", expression: "file.links[6].asFile().path" },
-  { name: "file unresolved wikilink as file", expression: "file.links[8].asFile().path" },
-  { name: "file markdown link rendered", expression: "file.links[9].toString()" },
-  { name: "file markdown encoded link rendered", expression: "file.links[10].toString()" },
-  { name: "file markdown unresolved link rendered", expression: "file.links[11].toString()" },
-  { name: "file markdown link as file", expression: "file.links[9].asFile().path" },
-  { name: "file markdown encoded link as file", expression: "file.links[10].asFile().path" },
-  { name: "file markdown unresolved link as file", expression: "file.links[11].asFile().path" },
+  { name: "file direct link raw target", expression: "file.links[0]" },
+  { name: "file frontmatter wikilink rendered", expression: "file.links.map(value.toString()).contains('[[Other|Front Alias]]')" },
+  { name: "file ordinary wikilink rendered", expression: "file.links.map(value.toString()).contains('[[Other|Other]]')" },
+  { name: "file alias wikilink rendered", expression: "file.links.map(value.toString()).contains('[[Other|Alias Other]]')" },
+  { name: "file heading wikilink rendered", expression: "file.links.map(value.toString()).contains('[[Other#Section One|Other > Section One]]')" },
+  { name: "file block wikilink rendered", expression: "file.links.map(value.toString()).contains('[[Other#^block-id|Other > ^block-id]]')" },
+  { name: "file duplicate wikilink resolves", expression: 'link("Duplicate").asFile().path' },
+  { name: "file full path duplicate resolves", expression: 'link("__codex_bases_expression_oracle/Folder B/Duplicate").asFile().path' },
+  { name: "file unresolved wikilink as file", expression: 'link("Missing Note").asFile().path' },
+  { name: "file markdown link rendered", expression: "file.links.map(value.toString()).contains('[[Other.md|Markdown Other]]')" },
+  { name: "file markdown encoded link rendered", expression: "file.links.map(value.toString()).contains('[[Spaced Note.md|Markdown Space]]')" },
+  { name: "file markdown unresolved link rendered", expression: "file.links.map(value.toString()).contains('[[Missing.md|Markdown Missing]]')" },
+  { name: "file markdown dot link rendered", expression: "file.links.map(value.toString()).contains('[[./Other.md|Markdown Dot]]')" },
+  { name: "file markdown subfolder link rendered", expression: "file.links.map(value.toString()).contains('[[Sub/Target.md|Markdown Sub]]')" },
+  { name: "file markdown link as file", expression: 'link("Other.md").asFile().path' },
+  { name: "file markdown encoded link as file", expression: 'link("Spaced Note.md").asFile().path' },
+  { name: "file markdown dot link as file", expression: 'link("./Other.md").asFile().path' },
+  { name: "file markdown subfolder link as file", expression: 'link("Sub/Target.md").asFile().path' },
+  { name: "file markdown unresolved link as file", expression: 'link("Missing.md").asFile().path' },
+  { name: "file special pipe heading rendered", expression: "file.links.map(value.toString()).contains('[[Other#Section|Pipe]]')" },
+  { name: "file special bracket heading rendered", expression: "file.links.map(value.toString()).contains('[[Other#Heading [Bracket|Other > Heading [Bracket]]')" },
+  { name: "file unicode wikilink rendered", expression: "file.links.map(value.toString()).contains('[[Unicode & Punctuation/Über Café, déjà vu! (v2)|Unicode Alias]]')" },
+  { name: "file unicode heading rendered", expression: "file.links.map(value.toString()).contains('[[Unicode & Punctuation/Über Café, déjà vu! (v2)#Café & crème: naïve? (v2)!|Unicode & Punctuation/Über Café, déjà vu! (v2) > Café & crème: naïve? (v2)!]]')" },
+  { name: "file unicode markdown rendered", expression: "file.links.map(value.toString()).contains('[[Unicode %26 Punctuation/Über Café%2C déjà vu! (v2).md|Unicode Markdown]]')" },
+  { name: "file unicode markdown encoded has link", expression: 'file.hasLink("Unicode %26 Punctuation/Über Café%2C déjà vu! (v2).md")' },
+  { name: "file unicode markdown encoded as file", expression: 'link("Unicode %26 Punctuation/Über Café%2C déjà vu! (v2).md").asFile().path' },
+  { name: "file has unicode link", expression: 'file.hasLink("Unicode & Punctuation/Über Café, déjà vu! (v2)")' },
+  { name: "file has unicode heading link", expression: 'file.hasLink("Unicode & Punctuation/Über Café, déjà vu! (v2)#Café & crème: naïve? (v2)!")' },
+  { name: "file unicode link as file", expression: 'link("Unicode & Punctuation/Über Café, déjà vu! (v2)").asFile().path' },
+  { name: "file unicode heading link as file", expression: 'link("Unicode & Punctuation/Über Café, déjà vu! (v2)#Café & crème: naïve? (v2)!").asFile().path' },
+  { name: "file lower-case basename as file", expression: 'link("other").asFile().path' },
+  { name: "file lower-case md has link", expression: 'file.hasLink("other.md")' },
+  { name: "file lower-case subpath has link", expression: 'file.hasLink("Other#section one")' },
+  { name: "file case target lower-case as file", expression: 'link("case target").asFile().path' },
+  { name: "file case target lower-case has link", expression: 'file.hasLink("case target.md")' },
+  { name: "file duplicate heading rendered", expression: "file.links.map(value.toString()).contains('[[Duplicate Anchors#Twin|Duplicate Anchors > Twin]]')" },
+  { name: "file duplicate heading alias rendered", expression: "file.links.map(value.toString()).contains('[[Duplicate Anchors#Twin|Twin Alias]]')" },
+  { name: "file duplicate block rendered", expression: "file.links.map(value.toString()).contains('[[Duplicate Anchors#^dupe-block|Duplicate Anchors > ^dupe-block]]')" },
+  { name: "file duplicate block alias rendered", expression: "file.links.map(value.toString()).contains('[[Duplicate Anchors#^dupe-block|Block Alias]]')" },
+  { name: "file duplicate heading as file", expression: 'link("Duplicate Anchors#Twin").asFile().path' },
+  { name: "file duplicate block as file", expression: 'link("Duplicate Anchors#^dupe-block").asFile().path' },
+  { name: "file has duplicate heading link", expression: 'file.hasLink("Duplicate Anchors#Twin")' },
+  { name: "file has duplicate block link", expression: 'file.hasLink("Duplicate Anchors#^dupe-block")' },
+  { name: "file pdf attachment rendered", expression: "file.links.map(value.toString()).contains('[[Report Final.pdf|Report Final.pdf]]')" },
+  { name: "file csv attachment alias rendered", expression: "file.links.map(value.toString()).contains('[[Data Export.csv|CSV Alias]]')" },
+  { name: "file markdown audio rendered", expression: "file.links.map(value.toString()).contains('[[Audio Track.mp3|Audio Track]]')" },
+  { name: "file has pdf attachment link", expression: 'file.hasLink("Report Final.pdf")' },
+  { name: "file has csv attachment link", expression: 'file.hasLink("Data Export.csv")' },
+  { name: "file has audio attachment link", expression: 'file.hasLink("Audio Track.mp3")' },
+  { name: "file pdf attachment as file", expression: 'link("Report Final.pdf").asFile().path' },
+  { name: "file audio attachment as file", expression: 'link("Audio Track.mp3").asFile().path' },
+  { name: "file csv attachment ext", expression: 'file("Data Export.csv").ext' },
   { name: "file embeds length", expression: "file.embeds.length" },
   { name: "file embeds rendered matrix", expression: "file.embeds.map(value.toString())" },
   { name: "file embeds as files matrix", expression: "file.embeds.map(value.asFile().path)" },
+  { name: "file pdf embed rendered", expression: "file.embeds.map(value.toString()).contains('[[Report Final.pdf|Report Final.pdf]]')" },
+  { name: "file markdown jpg embed rendered", expression: "file.embeds.map(value.toString()).contains('[[Photo Sample.jpg|Photo Alt]]')" },
+  { name: "file has jpg attachment embed", expression: 'file.hasLink("Photo Sample.jpg")' },
   { name: "file backlinks length", expression: "file.backlinks.length" },
   { name: "file backlinks rendered matrix", expression: "file.backlinks.map(value.toString())" },
   { name: "file has link", expression: 'file.hasLink("Other.md")' },
@@ -237,9 +290,14 @@ const cases = [
   { name: "file has spaced alias link", expression: 'file.hasLink("Spaced Note")' },
   { name: "file has unresolved raw link", expression: 'file.hasLink("Missing Note")' },
   { name: "file has unresolved md link", expression: 'file.hasLink("Missing Note.md")' },
+  { name: "file has markdown dot md link", expression: 'file.hasLink("./Other.md")' },
+  { name: "file has markdown subfolder md link", expression: 'file.hasLink("Sub/Target.md")' },
   { name: "file has markdown encoded md link", expression: 'file.hasLink("Spaced Note.md")' },
   { name: "file has markdown unresolved md link", expression: 'file.hasLink("Missing.md")' },
+  { name: "file has markdown image embed", expression: 'file.hasLink("Asset.png")' },
   { name: "file does not have external markdown link", expression: 'file.hasLink("https://example.com/path")' },
+  { name: "file has special pipe heading", expression: 'file.hasLink("Other#Section | Pipe")' },
+  { name: "file has special bracket heading", expression: 'file.hasLink("Other#Heading [Bracket]")' },
   { name: "file has property", expression: 'file.hasProperty("price")' },
   { name: "file has tag direct", expression: 'file.hasTag("work")' },
   { name: "file has tag nested", expression: 'file.hasTag("project")' },
@@ -250,6 +308,12 @@ const cases = [
   { name: "file global md lookup", expression: 'file("Other.md").path' },
   { name: "file global unresolved lookup", expression: 'file("Missing Note").path' },
   { name: "file global spaced lookup", expression: 'file("Spaced Note").path' },
+  { name: "file global relative source lookup", expression: 'file("Sub/Relative Source.md").path' },
+  { name: "relative source links rendered matrix", expression: 'file("Sub/Relative Source.md").links.map(value.toString())' },
+  { name: "relative source links as files matrix", expression: 'file("Sub/Relative Source.md").links.map(value.asFile().path)' },
+  { name: "relative source has parent markdown link", expression: 'file("Sub/Relative Source.md").hasLink("../Other.md")' },
+  { name: "relative source has sibling markdown link", expression: 'file("Sub/Relative Source.md").hasLink("Target.md")' },
+  { name: "relative source has parent encoded markdown link", expression: 'file("Sub/Relative Source.md").hasLink("../Spaced Note.md")' },
   { name: "link as file", expression: 'link("__codex_bases_expression_oracle/row.md").asFile().path' },
   { name: "link basename as file", expression: 'link("Other").asFile().path' },
   { name: "link md as file", expression: 'link("Other.md").asFile().path' },
@@ -258,6 +322,7 @@ const cases = [
   { name: "link duplicate as file", expression: 'link("Duplicate").asFile().path' },
   { name: "link unresolved as file", expression: 'link("Missing Note").asFile().path' },
   { name: "link markdown unresolved as file", expression: 'link("Missing.md").asFile().path' },
+  { name: "link relative dot as file", expression: 'link("./Other.md").asFile().path' },
   { name: "link spaced as file", expression: 'link("Spaced Note").asFile().path' },
   { name: "link equals file", expression: 'link("__codex_bases_expression_oracle/row.md") == file' },
   { name: "link aliases equal", expression: 'file.links[1] == link("Other")' },
@@ -324,9 +389,21 @@ const code = `
   const otherPath = dir + "/Other.md";
   const duplicateAPath = dir + "/Folder A/Duplicate.md";
   const duplicateBPath = dir + "/Folder B/Duplicate.md";
+  const unicodeDir = dir + "/Unicode & Punctuation";
+  const unicodePath = unicodeDir + "/Über Café, déjà vu! (v2).md";
+  const duplicateAnchorPath = dir + "/Duplicate Anchors.md";
+  const caseTargetPath = dir + "/Case Target.md";
   const spacedPath = dir + "/Spaced Note.md";
   const embeddedPath = dir + "/Embedded Note.md";
+  const subTargetPath = dir + "/Sub/Target.md";
+  const relativeSourcePath = dir + "/Sub/Relative Source.md";
+  const assetPath = dir + "/Asset.png";
+  const pdfPath = dir + "/Report Final.pdf";
+  const audioPath = dir + "/Audio Track.mp3";
+  const csvPath = dir + "/Data Export.csv";
+  const photoPath = dir + "/Photo Sample.jpg";
   const backlinkPath = dir + "/Backlink Source.md";
+  const backlinkMarkdownPath = dir + "/Backlink Markdown Source.md";
   const notePath = context.file.path;
   let scratchLeaf = null;
   const cleanup = async () => {
@@ -408,11 +485,43 @@ const code = `
     display: linkDisplay(linkCache),
     resolvedPath: addResolution(resolutions, linkCache.link, sourcePath),
   });
+  const frontmatterPropertyLinkRecord = (linkCache, sourcePath, resolutions) => {
+    const record = {
+      path: linkCache.link,
+      resolvedPath: addResolution(resolutions, linkCache.link, sourcePath),
+    };
+    if (linkCache.original?.includes("|")) record.display = linkCache.displayText;
+    return record;
+  };
+  const runtimeLink = (record) => {
+    const value = { path: record.path, resolvedPath: record.resolvedPath };
+    if (record.display !== undefined) value.display = { type: "String", value: record.display };
+    return { type: "Link", value };
+  };
   const backlinkRecord = (path) => ({
     path,
     display: basename(path),
     resolvedPath: path,
   });
+  const backlinkPathsFor = (file) => {
+    const backlinks = app.metadataCache.getBacklinksForFile(file);
+    return backlinks?.data instanceof Map ? Array.from(backlinks.data.keys()) : Object.keys(backlinks?.data ?? {});
+  };
+  const buildFileContext = (file, resolutions, properties = {}) => {
+    const cache = app.metadataCache.getFileCache(file) ?? {};
+    const links = [
+      ...(cache.frontmatterLinks ?? []).map((link) => linkRecord(link, file.path, resolutions)),
+      ...(cache.links ?? []).map((link) => linkRecord(link, file.path, resolutions)),
+      ...(cache.embeds ?? []).map((link) => linkRecord(link, file.path, resolutions)),
+    ];
+    return {
+      ...fileRecord(file),
+      properties,
+      links,
+      embeds: (cache.embeds ?? []).map((link) => linkRecord(link, file.path, resolutions)),
+      backlinks: backlinkPathsFor(file).map(backlinkRecord),
+    };
+  };
   const normalize = (value) => {
     if (value === null || value === undefined) return null;
     if (typeof value !== "object") return value;
@@ -435,13 +544,26 @@ const code = `
     await app.vault.createFolder(dir);
     await app.vault.createFolder(dir + "/Folder A");
     await app.vault.createFolder(dir + "/Folder B");
-    const other = await app.vault.create(otherPath, "---\\nstatus: Other\\n---\\nOther note\\n\\n## Section One\\nHeading target\\n\\nBlock target ^block-id\\n");
+    await app.vault.createFolder(dir + "/Sub");
+    await app.vault.createFolder(unicodeDir);
+    const other = await app.vault.create(otherPath, "---\\nstatus: Other\\n---\\nOther note\\n\\n## Section One\\nHeading target\\n\\n## Section | Pipe\\nPipe heading target\\n\\n## Heading [Bracket]\\nBracket heading target\\n\\nBlock target ^block-id\\n");
     const duplicateA = await app.vault.create(duplicateAPath, "---\\nstatus: Duplicate A\\n---\\nDuplicate A\\n");
     const duplicateB = await app.vault.create(duplicateBPath, "---\\nstatus: Duplicate B\\n---\\nDuplicate B\\n");
+    const unicode = await app.vault.create(unicodePath, "---\\nstatus: Unicode\\n---\\nUnicode note\\n\\n## Café & crème: naïve? (v2)!\\nUnicode heading target\\n\\n## CASE Heading\\nCase heading target\\n\\nBlock target ^cafe-block\\n");
+    const duplicateAnchor = await app.vault.create(duplicateAnchorPath, "---\\nstatus: Duplicate Anchors\\n---\\nDuplicate anchors\\n\\n## Twin\\nFirst twin ^dupe-block\\n\\n## Twin\\nSecond twin ^dupe-block\\n");
+    const caseTarget = await app.vault.create(caseTargetPath, "---\\nstatus: Case Target\\n---\\nCase target\\n");
     const spaced = await app.vault.create(spacedPath, "---\\nstatus: Spaced\\n---\\nSpaced note\\n");
     const embedded = await app.vault.create(embeddedPath, "---\\nstatus: Embedded\\n---\\nEmbedded note\\n");
-    const note = await app.vault.create(notePath, "---\\nprice: 12.5\\nquantity: 4\\nstatus: Todo\\ntags:\\n  - urgent\\n  - work\\nvalues:\\n  - 1\\n  - 2\\n  - 3\\nspace key: space value\\n---\\nBody #project/a links to [[Other]]\\nAlias: [[Other|Alias Other]]\\nHeading: [[Other#Section One]]\\nBlock: [[Other#^block-id]]\\nDuplicate ambiguous: [[Duplicate]]\\nDuplicate A: [[__codex_bases_expression_oracle/Folder A/Duplicate|Dup A]]\\nDuplicate B: [[__codex_bases_expression_oracle/Folder B/Duplicate]]\\nSpaced alias: [[Spaced Note|Space Alias]]\\nMissing: [[Missing Note]]\\nMarkdown note: [Markdown Other](Other.md)\\nMarkdown encoded: [Markdown Space](Spaced%20Note.md)\\nMarkdown missing: [Markdown Missing](Missing.md)\\nExternal markdown: [Example](https://example.com/path)\\nEmbed note: ![[Embedded Note]]\\nEmbed heading: ![[Other#Section One]]\\n");
+    const subTarget = await app.vault.create(subTargetPath, "---\\nstatus: Sub Target\\n---\\nSub target note\\n");
+    const asset = await app.vault.create(assetPath, "not really png");
+    const pdf = await app.vault.create(pdfPath, "not really pdf");
+    const audio = await app.vault.create(audioPath, "not really mp3");
+    const csv = await app.vault.create(csvPath, "name,value\\nalpha,1\\n");
+    const photo = await app.vault.create(photoPath, "not really jpg");
+    const relativeSource = await app.vault.create(relativeSourcePath, "Parent markdown: [Parent Other](../Other.md)\\nSibling markdown: [Sibling Target](Target.md)\\nParent encoded: [Parent Space](../Spaced%20Note.md)\\nParent wikilink-ish: [[../Other]]\\n");
+    const note = await app.vault.create(notePath, "---\\nprice: 12.5\\nquantity: 4\\nstatus: Todo\\ntags:\\n  - urgent\\n  - work\\nvalues:\\n  - 1\\n  - 2\\n  - 3\\nspace key: space value\\nfrontWiki: \\"[[Other|Front Alias]]\\"\\nfrontList:\\n  - \\"[[Spaced Note]]\\"\\n  - \\"[Front MD](Other.md)\\"\\nfrontMd: \\"[Front MD](Other.md)\\"\\n---\\nBody #project/a links to [[Other]]\\nAlias: [[Other|Alias Other]]\\nHeading: [[Other#Section One]]\\nBlock: [[Other#^block-id]]\\nDuplicate ambiguous: [[Duplicate]]\\nDuplicate A: [[__codex_bases_expression_oracle/Folder A/Duplicate|Dup A]]\\nDuplicate B: [[__codex_bases_expression_oracle/Folder B/Duplicate]]\\nSpaced alias: [[Spaced Note|Space Alias]]\\nMissing: [[Missing Note]]\\nMarkdown note: [Markdown Other](Other.md)\\nMarkdown encoded: [Markdown Space](Spaced%20Note.md)\\nMarkdown missing: [Markdown Missing](Missing.md)\\nMarkdown dot: [Markdown Dot](./Other.md)\\nMarkdown subfolder: [Markdown Sub](Sub/Target.md)\\nExternal markdown: [Example](https://example.com/path)\\nSpecial heading: [[Other#Section | Pipe]]\\nBracket heading: [[Other#Heading [Bracket]]]\\nUnicode path: [[Unicode & Punctuation/Über Café, déjà vu! (v2)|Unicode Alias]]\\nUnicode heading: [[Unicode & Punctuation/Über Café, déjà vu! (v2)#Café & crème: naïve? (v2)!]]\\nUnicode markdown: [Unicode Markdown](Unicode%20%26%20Punctuation/%C3%9Cber%20Caf%C3%A9%2C%20d%C3%A9j%C3%A0%20vu!%20(v2).md)\\nCase exact: [[Case Target]]\\nDuplicate heading target: [[Duplicate Anchors#Twin]]\\nDuplicate heading alias: [[Duplicate Anchors#Twin|Twin Alias]]\\nDuplicate block target: [[Duplicate Anchors#^dupe-block]]\\nDuplicate block alias: [[Duplicate Anchors#^dupe-block|Block Alias]]\\nAttachment pdf: [[Report Final.pdf]]\\nAttachment csv alias: [[Data Export.csv|CSV Alias]]\\nMarkdown audio: [Audio Track](Audio%20Track.mp3)\\nEmbed note: ![[Embedded Note]]\\nEmbed heading: ![[Other#Section One]]\\nMarkdown image: ![Asset Alt](Asset.png)\\nPDF embed: ![[Report Final.pdf]]\\nMarkdown jpg image: ![Photo Alt](Photo%20Sample.jpg)\\nExternal image: ![Remote](https://example.com/a.png)\\n");
     const backlinkSource = await app.vault.create(backlinkPath, "Links back to [[__codex_bases_expression_oracle/row.md]] and [[__codex_bases_expression_oracle/row.md|Row Alias]].\\n");
+    const backlinkMarkdownSource = await app.vault.create(backlinkMarkdownPath, "Markdown backlink to [Row Markdown](__codex_bases_expression_oracle/row.md).\\n");
     let linkMetadataLast = {};
     const linkMetadata = await waitFor(() => {
       const cache = app.metadataCache.getFileCache(note);
@@ -451,12 +573,21 @@ const code = `
       linkMetadataLast = {
         links: cache?.links?.length ?? 0,
         embeds: cache?.embeds?.length ?? 0,
+        frontmatterLinks: cache?.frontmatterLinks?.length ?? 0,
         backlinkCount,
+        relativeSourceLinks: app.metadataCache.getFileCache(relativeSource)?.links?.length ?? 0,
         linkTargets: (cache?.links ?? []).map((link) => link.link),
         embedTargets: (cache?.embeds ?? []).map((link) => link.link),
+        frontmatterTargets: (cache?.frontmatterLinks ?? []).map((link) => link.link),
         backlinkPaths,
       };
-      if ((cache?.links?.length ?? 0) >= 12 && (cache?.embeds?.length ?? 0) >= 2 && backlinkCount >= 1) {
+      if (
+        (cache?.links?.length ?? 0) >= 27 &&
+        (cache?.embeds?.length ?? 0) >= 5 &&
+        (cache?.frontmatterLinks?.length ?? 0) >= 4 &&
+        (app.metadataCache.getFileCache(relativeSource)?.links?.length ?? 0) >= 4 &&
+        backlinkCount >= 2
+      ) {
         return { cache, backlinks };
       }
       return null;
@@ -473,32 +604,54 @@ const code = `
     const FormulaCtor = Object.getPrototypeOf(controller.ctx.formulas.seed).constructor;
     const ContextCtor = Object.getPrototypeOf(controller.ctx).constructor;
     context.now = new Date().toISOString();
-    const allFiles = [note, other, duplicateA, duplicateB, spaced, embedded, backlinkSource];
+    const allFiles = [
+      note,
+      other,
+      duplicateA,
+      duplicateB,
+      unicode,
+      duplicateAnchor,
+      caseTarget,
+      spaced,
+      embedded,
+      subTarget,
+      relativeSource,
+      asset,
+      pdf,
+      audio,
+      csv,
+      photo,
+      backlinkSource,
+      backlinkMarkdownSource,
+    ];
     const linkResolutions = {};
     addFileResolutions(linkResolutions, allFiles);
-    const links = [
-      ...(linkMetadata.cache.links ?? []).map((link) => linkRecord(link, note.path, linkResolutions)),
-      ...(linkMetadata.cache.embeds ?? []).map((link) => linkRecord(link, note.path, linkResolutions)),
-    ];
-    const embeds = (linkMetadata.cache.embeds ?? []).map((link) => linkRecord(link, note.path, linkResolutions));
-    const backlinkPaths = (linkMetadata.backlinks?.data instanceof Map ? Array.from(linkMetadata.backlinks.data.keys()) : Object.keys(linkMetadata.backlinks?.data ?? {})).sort();
-    const backlinks = backlinkPaths.map(backlinkRecord);
+    const frontmatterRecords = Object.fromEntries((linkMetadata.cache.frontmatterLinks ?? []).map((link) => [
+      link.key,
+      frontmatterPropertyLinkRecord(link, note.path, linkResolutions),
+    ]));
+    context.note = {
+      ...context.note,
+      frontWiki: runtimeLink(frontmatterRecords.frontWiki),
+      frontList: [runtimeLink(frontmatterRecords["frontList.0"]), "[Front MD](Other.md)"],
+      frontMd: "[Front MD](Other.md)",
+    };
     context.file = {
-      ...context.file,
+      ...buildFileContext(note, linkResolutions, context.note),
       path: note.path,
       name: note.name,
       basename: note.basename,
       folder: note.parent?.path ?? "",
       ext: note.extension,
       size: note.stat.size,
-      properties: context.note,
+      tags: ["urgent", "work", "project/a"],
       ctime: new Date(note.stat.ctime).toISOString(),
       mtime: new Date(note.stat.mtime).toISOString(),
-      links,
-      embeds,
-      backlinks,
     };
-    context.files = [context.file, ...allFiles.filter((file) => file.path !== note.path).map(fileRecord)];
+    context.files = [
+      context.file,
+      ...allFiles.filter((file) => file.path !== note.path).map((file) => buildFileContext(file, linkResolutions, app.metadataCache.getFileCache(file)?.frontmatter ?? {})),
+    ];
     context.linkResolutions = linkResolutions;
     const formulas = Object.fromEntries(Object.entries(context.formulas).map(([name, formula]) => [name, new FormulaCtor(formula)]));
     const ctx = new ContextCtor(app, null, formulas, note);
@@ -514,7 +667,16 @@ const code = `
       results.push({ ...testCase, context, expected: result });
     }
     await cleanup();
-    console.log("ORACLE_JSON_START" + JSON.stringify({ generatedAt: new Date().toISOString(), cases: results }) + "ORACLE_JSON_END");
+    const obsidianVersion = typeof app.getVersion === "function" ? app.getVersion() : app.version ?? null;
+    const obsidianBuild = app.build ?? app.appId ?? null;
+    console.log("ORACLE_JSON_START" + JSON.stringify({
+      generatedAt: new Date().toISOString(),
+      obsidian: {
+        version: obsidianVersion,
+        build: obsidianBuild,
+      },
+      cases: results,
+    }) + "ORACLE_JSON_END");
   } catch (error) {
     await cleanup().catch(() => {});
     console.log("ORACLE_ERROR", error?.stack ?? error?.message ?? String(error));

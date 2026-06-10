@@ -76,7 +76,12 @@ function visit(
     case "Call":
       if (expr.callee.type === "Identifier") state.functions.add(expr.callee.name);
       if (expr.callee.type === "Member" && typeof expr.callee.property === "string") state.functions.add(expr.callee.property);
-      visit(expr.callee, state);
+      if (expr.callee.type === "Member") {
+        visit(expr.callee.object, state);
+        if (expr.callee.computed && typeof expr.callee.property !== "string") visit(expr.callee.property, state);
+      } else if (expr.callee.type !== "Identifier") {
+        visit(expr.callee, state);
+      }
       expr.args.forEach((arg) => visit(arg, state));
       break;
     case "Literal":

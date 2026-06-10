@@ -193,7 +193,14 @@ export function errorValue(message: string): RuntimeValue {
 
 export function fromJs(value: unknown, typeHint?: string): RuntimeValue {
   if (value && typeof value === "object" && "type" in value && "value" in value) {
-    return value as RuntimeValue;
+    const runtimeValue = value as RuntimeValue;
+    if (runtimeValue.type === "Link") {
+      return linkValue(runtimeValue.value.path, runtimeValue.value.display, runtimeValue.value.resolvedPath);
+    }
+    if (runtimeValue.type === "File") {
+      return fileValue(runtimeValue.value);
+    }
+    return runtimeValue;
   }
   if (typeHint === "date" || value instanceof Date) return dateValue(value as Date | string | number);
   if (value === null || value === undefined) return nullValue();
@@ -231,7 +238,7 @@ export function toPlain(value: RuntimeValue): unknown {
     case "File":
       return value.value.path;
     case "Link":
-      return value.value.display ? { path: value.value.path, display: toPlain(value.value.display) } : value.value.path;
+      return value.value.path;
     case "RegExp":
       return `/${value.value.source}/${value.value.flags}`;
     case "Image":
