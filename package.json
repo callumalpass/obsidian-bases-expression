@@ -1,0 +1,49 @@
+{
+  "name": "obsidian-bases-expression",
+  "version": "0.1.0",
+  "description": "Standalone parser, evaluator, diagnostics, and editor tooling for Obsidian Bases-compatible expressions.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "obsidian",
+    "bases",
+    "formula",
+    "expression",
+    "parser",
+    "language-service"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "docs:upstream:check": "node scripts/check-obsidian-docs.mjs",
+    "docs:upstream:update": "node scripts/check-obsidian-docs.mjs --update",
+    "oracle:generate": "node scripts/generate-oracle-fixtures.mjs",
+    "verify": "npm run check && npm test && npm run build"
+  },
+  "dependencies": {
+    "moment": "^2.30.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "fast-check": "^4.1.1",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.0"
+  }
+}
