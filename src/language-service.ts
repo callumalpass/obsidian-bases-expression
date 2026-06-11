@@ -14,6 +14,7 @@ import {
   type FunctionMetadata,
   type PropertyMetadata,
 } from "./metadata.js";
+import { tokenize, type Token } from "./lexer.js";
 import { parseExpression } from "./parser.js";
 
 export interface PropertyCompletion {
@@ -22,6 +23,17 @@ export interface PropertyCompletion {
   source?: "note" | "file" | "formula" | "this" | "object";
   detail?: string;
   documentation?: string;
+  values?: PropertyValueCompletion[];
+}
+
+export interface PropertyValueCompletion {
+  value: unknown;
+  label?: string;
+  insertText?: string;
+  type?: FormulaValueType | string;
+  detail?: string;
+  documentation?: string;
+  count?: number;
 }
 
 export interface ObjectPropertyCompletion extends PropertyCompletion {
@@ -44,10 +56,13 @@ export interface FunctionCompletion {
 
 export interface CompletionItem {
   label: string;
-  kind: "property" | "function" | "keyword" | "operator";
+  kind: "property" | "function" | "keyword" | "operator" | "value";
   insertText: string;
+  from?: number;
+  to?: number;
   detail?: string;
   documentation?: string;
+  value?: unknown;
 }
 
 export interface FormulaLanguageSchema {
@@ -99,8 +114,10 @@ export interface SignatureHelp {
 
 export interface CodeMirrorCompletion {
   label: string;
-  type: "property" | "function" | "keyword" | "operator";
+  type: "property" | "function" | "keyword" | "operator" | "value";
   apply: string;
+  from?: number;
+  to?: number;
   detail?: string;
   info?: string;
 }
@@ -114,7 +131,7 @@ export interface CodeMirrorDiagnostic {
 }
 
 interface Reference {
-  kind: "note-property" | "file-property" | "formula-property" | "object-property" | "global-function" | "method";
+  kind: "note-property" | "file-property" | "formula-property" | "object-property" | "global-function" | "method" | "member";
   name: string;
   span: Span;
   path?: string;
@@ -151,6 +168,7 @@ export function validateExpressionDetailed(
 
   if (parsed.ast && !diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
     diagnostics.push(...semanticDiagnostics(references, schema));
+    diagnostics.push(...typeDiagnostics(parsed.ast, schema));
     if (options.runEvaluation && options.context) {
       const result = evaluateExpression(parsed.ast, options.context);
       if (result.value.type === "Error") {
@@ -183,11 +201,20 @@ export function completeExpression(
   position: number,
   schema: FormulaLanguageSchema = {},
 ): CompletionItem[] {
-  const prefix = getPrefix(source, position);
-  const receiverExpression = getReceiverExpression(source, position);
+  const context = getCompletionContext(source, position, schema);
   const items: CompletionItem[] = [];
 
-  if (receiverExpression) {
+  if (context.kind === "value") {
+    if (context.property?.values?.length) {
+      items.push(...completePropertyValues(context.property, {
+        prefix: context.prefix,
+        quoted: context.quoted,
+      }));
+    } else {
+      items.push(...expectedTypeCompletions(context.expectedTypes, schema, context.quoted));
+    }
+  } else if (context.kind === "member") {
+    const receiverExpression = context.receiverExpression ?? "";
     const receiverType = inferReceiverExpressionType(receiverExpression, schema);
     if (receiverType === "file") items.push(...filePropertyMetadata.map(propertyToCompletion));
     if (receiverType === "object" && receiverExpression === "formula") items.push(...(schema.formulas ?? []).map(propertyToCompletion));
@@ -195,17 +222,45 @@ export function completeExpression(
     items.push(...(objectPropertiesForReceiver(receiverExpression, schema) ?? []).map(propertyToCompletion));
     if (receiverExpression === "this") items.push(propertyToCompletion({ name: "file", type: "file", source: "this" }));
     items.push(...functionsForReceiver(receiverType).map(functionToCompletion));
+  } else if (context.kind === "none") {
+    return [];
   } else {
-    items.push(...keywords.map(keywordToCompletion));
-    items.push(...(schema.properties ?? []).map(propertyToCompletion));
-    items.push(...(schema.objects ?? []).map(propertyToCompletion));
-    items.push(...globalFunctionMetadata.map(functionToCompletion));
-    items.push(...(schema.functions ?? []).map(functionToCompletion));
+    if (context.expectedTypes.length) {
+      items.push(...expectedTypeCompletions(context.expectedTypes, schema, false));
+    }
+    if (!context.expectedTypes.length || context.prefix) {
+      items.push(...keywords.map(keywordToCompletion));
+      items.push(...(schema.properties ?? []).map(propertyToCompletion));
+      items.push(...(schema.objects ?? []).map(propertyToCompletion));
+      items.push(...globalFunctionMetadata.map(functionToCompletion));
+      items.push(...(schema.functions ?? []).map(functionToCompletion));
+    }
   }
 
-  return dedupe(items)
-    .filter((item) => item.label.startsWith(prefix))
-    .sort((a, b) => a.label.localeCompare(b.label));
+  return withCompletionRange(dedupe(items), context.from, context.to)
+    .map((item) => ({ item, score: scoreCompletion(item, context.prefix, context.expectedTypes) }))
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score || a.item.label.localeCompare(b.item.label))
+    .map(({ item }) => item);
+}
+
+export interface PropertyValueCompletionOptions {
+  prefix?: string;
+  quoted?: boolean;
+}
+
+export function completePropertyValues(
+  property: PropertyCompletion | undefined,
+  options: PropertyValueCompletionOptions = {},
+): CompletionItem[] {
+  if (!property?.values?.length) return [];
+  const prefix = (options.prefix ?? "").trim().toLowerCase();
+  const quoted = options.quoted ?? false;
+  return dedupe(property.values.map((value) => propertyValueToCompletion(value, property, quoted)))
+    .map((item) => ({ item, score: scoreCompletionValue(item, prefix) }))
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score || a.item.label.localeCompare(b.item.label))
+    .map(({ item }) => item);
 }
 
 export function getHoverInfo(source: string, position: number, schema: FormulaLanguageSchema = {}): HoverInfo | null {
@@ -248,13 +303,18 @@ export function getSignatureHelp(source: string, position: number, schema: Formu
 }
 
 export function toCodeMirrorCompletions(items: CompletionItem[]): CodeMirrorCompletion[] {
-  return items.map((item) => ({
-    label: item.label,
-    type: item.kind,
-    apply: item.insertText,
-    ...(item.detail ? { detail: item.detail } : {}),
-    ...(item.documentation ? { info: item.documentation } : {}),
-  }));
+  return items.map((item) => {
+    const completion: CodeMirrorCompletion = {
+      label: item.label,
+      type: item.kind,
+      apply: item.insertText,
+    };
+    if (item.from !== undefined) completion.from = item.from;
+    if (item.to !== undefined) completion.to = item.to;
+    if (item.detail) completion.detail = item.detail;
+    if (item.documentation) completion.info = item.documentation;
+    return completion;
+  });
 }
 
 export function toCodeMirrorDiagnostics(diagnostics: Diagnostic[]): CodeMirrorDiagnostic[] {
@@ -281,6 +341,304 @@ export function createFormulaLanguageService(schema: FormulaLanguageSchema = {})
   };
 }
 
+type CompletionContextKind = "global" | "member" | "none" | "value";
+
+interface CompletionContextInfo {
+  kind: CompletionContextKind;
+  prefix: string;
+  from: number;
+  to: number;
+  receiverExpression?: string;
+  property?: PropertyCompletion;
+  expectedTypes: string[];
+  quoted: boolean;
+}
+
+interface ValuePrefixInfo {
+  beforeValue: string;
+  prefix: string;
+  quoted: boolean;
+  from: number;
+  to: number;
+}
+
+interface ActiveCallContext {
+  calleeExpression: string;
+  argumentIndex: number;
+}
+
+function getCompletionContext(source: string, position: number, schema: FormulaLanguageSchema): CompletionContextInfo {
+  const valuePrefix = valuePrefixBeforeCursor(source, position);
+  const propertyExpression = propertyExpressionBeforeValue(valuePrefix.beforeValue);
+  const property = propertyExpression ? propertyForValueExpression(propertyExpression, schema) : undefined;
+  const callContext = activeCallContext(source, valuePrefix.from);
+  const expectedTypes = uniqueStrings([
+    ...expectedTypesForComparisonProperty(property),
+    ...expectedTypesForCallArgument(callContext, schema),
+  ]);
+
+  if (property || expectedTypes.length || valuePrefix.quoted) {
+    const context: CompletionContextInfo = {
+      kind: "value",
+      prefix: valuePrefix.prefix,
+      from: valuePrefix.from,
+      to: valuePrefix.to,
+      expectedTypes,
+      quoted: valuePrefix.quoted,
+    };
+    if (property) context.property = property;
+    return context;
+  }
+
+  const member = memberCompletionContext(source, position);
+  if (member) {
+    return {
+      kind: "member",
+      prefix: member.prefix,
+      from: member.from,
+      to: position,
+      receiverExpression: member.receiverExpression,
+      expectedTypes: [],
+      quoted: false,
+    };
+  }
+
+  const identifier = identifierCompletionRange(source, position);
+  if (isInvalidOpenParenCompletionContext(source, identifier.from)) {
+    return {
+      kind: "none",
+      prefix: "",
+      from: position,
+      to: position,
+      expectedTypes: [],
+      quoted: false,
+    };
+  }
+  return {
+    kind: "global",
+    prefix: identifier.prefix,
+    from: identifier.from,
+    to: position,
+    expectedTypes: expectedTypesForCallArgument(activeCallContext(source, position), schema),
+    quoted: false,
+  };
+}
+
+function isInvalidOpenParenCompletionContext(source: string, position: number): boolean {
+  const tokens = tokenize(source.slice(0, position)).tokens.filter((token) => token.type !== "eof");
+  const openParen = tokens[tokens.length - 1];
+  const previous = tokens[tokens.length - 2];
+  if (openParen?.value !== "(" || !previous) return false;
+  return previous.type === "string"
+    || previous.type === "number"
+    || previous.type === "regex"
+    || [")", "]", "}"].includes(previous.value);
+}
+
+function memberCompletionContext(source: string, position: number): { receiverExpression: string; prefix: string; from: number } | null {
+  const before = source.slice(0, position);
+  const tokens = tokenize(before).tokens.filter((token) => token.type !== "eof");
+  const last = tokens[tokens.length - 1];
+  const previous = tokens[tokens.length - 2];
+  let dot: Token | undefined;
+  let prefix = "";
+  let from = position;
+
+  if (last?.value === ".") {
+    dot = last;
+  } else if (last?.type === "identifier" && previous?.value === ".") {
+    dot = previous;
+    prefix = before.slice(last.start, position);
+    from = last.start;
+  }
+  if (!dot) return null;
+
+  const receiverExpression = receiverExpressionBeforeDot(source, dot.start);
+  if (!receiverExpression) return null;
+  return {
+    receiverExpression,
+    prefix,
+    from,
+  };
+}
+
+function receiverExpressionBeforeDot(source: string, dotPosition: number): string | null {
+  const tokens = tokenize(source.slice(0, dotPosition)).tokens.filter((token) => token.type !== "eof");
+  const startIndex = expressionStartBefore(tokens, tokens.length - 1);
+  if (startIndex === null) return null;
+  return source.slice(tokens[startIndex]!.start, dotPosition).trim();
+}
+
+function expressionStartBefore(tokens: Token[], endIndex: number): number | null {
+  if (endIndex < 0) return null;
+  const token = tokens[endIndex];
+  if (!token) return null;
+
+  let start: number | null = null;
+  if (token.value === ")") {
+    const openIndex = matchingOpenTokenIndex(tokens, endIndex, "(", ")");
+    if (openIndex === null) return null;
+    start = openIndex > 0 && canEndExpression(tokens[openIndex - 1]!)
+      ? expressionStartBefore(tokens, openIndex - 1)
+      : openIndex;
+  } else if (token.value === "]") {
+    const openIndex = matchingOpenTokenIndex(tokens, endIndex, "[", "]");
+    if (openIndex === null) return null;
+    start = openIndex > 0 && canEndExpression(tokens[openIndex - 1]!)
+      ? expressionStartBefore(tokens, openIndex - 1)
+      : openIndex;
+  } else if (canStartPrimaryExpression(token)) {
+    start = endIndex;
+  }
+
+  if (start === null) return null;
+  while (start > 1 && tokens[start - 1]?.value === ".") {
+    const objectStart = expressionStartBefore(tokens, start - 2);
+    if (objectStart === null) return null;
+    start = objectStart;
+  }
+  return start;
+}
+
+function matchingOpenTokenIndex(tokens: Token[], closeIndex: number, openValue: string, closeValue: string): number | null {
+  let depth = 0;
+  for (let index = closeIndex; index >= 0; index -= 1) {
+    const value = tokens[index]?.value;
+    if (value === closeValue) depth += 1;
+    else if (value === openValue) {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return null;
+}
+
+function canStartPrimaryExpression(token: Token): boolean {
+  return token.type === "identifier"
+    || token.type === "number"
+    || token.type === "string"
+    || token.type === "regex";
+}
+
+function canEndExpression(token: Token): boolean {
+  return canStartPrimaryExpression(token) || [")", "]", "}"].includes(token.value);
+}
+
+function identifierCompletionRange(source: string, position: number): { prefix: string; from: number } {
+  const prefix = getPrefix(source, position);
+  return {
+    prefix,
+    from: position - prefix.length,
+  };
+}
+
+function expectedTypesForComparisonProperty(property: PropertyCompletion | undefined): string[] {
+  if (!property?.type || property.type === "any") return [];
+  return [String(property.type)];
+}
+
+function expectedTypesForCallArgument(callContext: ActiveCallContext | null, schema: FormulaLanguageSchema): string[] {
+  if (!callContext) return [];
+  const fn = functionForCalleeExpression(callContext.calleeExpression, schema);
+  if (!fn) return [];
+  const parameter = fn.parameters?.[Math.min(callContext.argumentIndex, Math.max(0, fn.parameters.length - 1))];
+  return expectedTypesFromParameter(parameter);
+}
+
+function activeCallContext(source: string, position: number): ActiveCallContext | null {
+  const tokens = tokenize(source.slice(0, position)).tokens.filter((token) => token.type !== "eof");
+  const stack: Array<{ token: Token; calleeExpression: string | null; argumentIndex: number }> = [];
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index]!;
+    if (token.value === "(") {
+      stack.push({
+        token,
+        calleeExpression: calleeExpressionBeforeToken(source, tokens, index),
+        argumentIndex: 0,
+      });
+    } else if (token.value === ")") {
+      stack.pop();
+    } else if (token.value === "," && stack.length) {
+      stack[stack.length - 1]!.argumentIndex += 1;
+    }
+  }
+  const call = [...stack].reverse().find((item) => item.calleeExpression);
+  return call && call.calleeExpression
+    ? { calleeExpression: call.calleeExpression, argumentIndex: call.argumentIndex }
+    : null;
+}
+
+function calleeExpressionBeforeToken(source: string, tokens: Token[], openParenIndex: number): string | null {
+  const openParen = tokens[openParenIndex];
+  if (!openParen) return null;
+  const before = source.slice(0, openParen.start);
+  return before.match(/([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*$/)?.[1] ?? null;
+}
+
+function functionForCalleeExpression(calleeExpression: string, schema: FormulaLanguageSchema): FunctionCompletion | FunctionMetadata | undefined {
+  const parts = calleeExpression.split(".");
+  const name = parts.pop();
+  if (!name) return undefined;
+  if (!parts.length) return getGlobalFunction(name) ?? schema.functions?.find((fn) => fn.name === name);
+  const receiverExpression = parts.join(".");
+  const receiverType = inferReceiverExpressionType(receiverExpression, schema);
+  return getMethodFunction(name, receiverType);
+}
+
+function expectedTypesFromParameter(parameter: string | undefined): string[] {
+  if (!parameter) return [];
+  const typeText = parameter.split(":").slice(1).join(":").replace(/[?()[\].]/g, " ").trim();
+  if (!typeText) return [];
+  return uniqueStrings(typeText
+    .split("|")
+    .map((part) => part.replace(/\binput\b|\belement\b|\btarget\b|\bdisplay\b|\bpath\b|\bname\b|\bhtml\b|\bformat\b|\bfolder\b|\bseparator\b|\blimit\b|\bpattern\b|\breplacement\b|\bstart\b|\bend\b|\bdigits\b|\bcondition\b|\btrueResult\b|\bfalseResult\b/g, "").trim())
+    .flatMap((part) => part.split(/\s+/))
+    .map((part) => part.replace(/^\.\.\./, "").replace(/\[\]$/, "").trim())
+    .filter((part) => Boolean(part) && part !== "optional"));
+}
+
+function expectedTypeCompletions(expectedTypes: string[], schema: FormulaLanguageSchema, quoted: boolean): CompletionItem[] {
+  if (!expectedTypes.length || expectedTypes.includes("any") || expectedTypes.includes("value")) return [];
+  if (quoted) return [];
+  const items: CompletionItem[] = [];
+  const expected = new Set(expectedTypes);
+  if (expected.has("boolean")) {
+    items.push(keywordToCompletion("true"), keywordToCompletion("false"));
+  }
+  const properties = [
+    ...(schema.properties ?? []),
+    ...(schema.formulas ?? []).map((formula) => ({ ...formula, name: `formula.${formula.name}` })),
+  ];
+  items.push(...properties
+    .filter((property) => property.type && expected.has(String(property.type)))
+    .map(propertyToCompletion));
+  items.push(...globalFunctionMetadata
+    .filter((fn) => expected.has(fn.returns))
+    .map(functionToCompletion));
+  items.push(...(schema.functions ?? [])
+    .filter((fn) => fn.returns && expected.has(String(fn.returns)))
+    .map(functionToCompletion));
+  return items;
+}
+
+function withCompletionRange(items: CompletionItem[], from: number, to: number): CompletionItem[] {
+  return items.map((item) => ({ ...item, from, to }));
+}
+
+function scoreCompletion(item: CompletionItem, prefix: string, expectedTypes: string[]): number {
+  const normalizedPrefix = prefix.toLowerCase();
+  const label = item.label.toLowerCase();
+  const insertText = item.insertText.toLowerCase();
+  let score = expectedTypes.length ? 10 : 1;
+  if (!normalizedPrefix) return score;
+  if (label === normalizedPrefix || insertText === normalizedPrefix) score += 1000;
+  else if (label.startsWith(normalizedPrefix) || insertText.startsWith(normalizedPrefix)) score += 800;
+  else if (label.includes(normalizedPrefix) || insertText.includes(normalizedPrefix)) score += 300;
+  else return 0;
+  if (item.kind === "value") score += 200;
+  return score;
+}
+
 function semanticDiagnostics(refs: Reference[], schema: FormulaLanguageSchema): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const noteProperties = new Map((schema.properties ?? []).map((property) => [property.name, property]));
@@ -291,19 +649,220 @@ function semanticDiagnostics(refs: Reference[], schema: FormulaLanguageSchema): 
     if (ref.kind === "note-property" && noteProperties.size && !noteProperties.has(ref.name)) {
       diagnostics.push(warning("unknown-property", `Unknown note property ${ref.name}`, ref.span));
     } else if (ref.kind === "file-property" && !getFileProperty(ref.name)) {
-      diagnostics.push(warning("unknown-file-property", `Unknown file property ${ref.name}`, ref.span));
+      diagnostics.push(warning("unknown-file-property", nativeMemberDiagnostic(ref.name, "file"), ref.span));
     } else if (ref.kind === "formula-property" && formulaProperties.size && !formulaProperties.has(ref.name)) {
       diagnostics.push(warning("unknown-formula", `Unknown formula ${ref.name}`, ref.span));
     } else if (ref.kind === "object-property" && ref.path && unknownObjectPath(ref.path, schema)) {
       diagnostics.push(warning("unknown-object-property", `Unknown object property ${ref.path}`, ref.span));
     } else if (ref.kind === "global-function" && !getGlobalFunction(ref.name) && !customFunctions.has(ref.name)) {
-      diagnostics.push(warning("unknown-function", `Unknown function ${ref.name}`, ref.span));
+      diagnostics.push(warning("unknown-function", `Cannot find function "${ref.name}"`, ref.span));
     } else if (ref.kind === "method" && !getMethodFunction(ref.name, ref.receiverType)) {
-      const receiver = ref.receiverType === "any" || !ref.receiverType ? "this value" : `${ref.receiverType} values`;
-      diagnostics.push(warning("method-not-available", `Function ${ref.name} is not available on ${receiver}`, ref.span));
+      diagnostics.push(warning("method-not-available", nativeMethodDiagnostic(ref.name, ref.receiverType), ref.span));
+    } else if (ref.kind === "member" && !memberIsAvailable(ref.receiverType, ref.name)) {
+      diagnostics.push(warning("method-not-available", nativeMemberDiagnostic(ref.name, ref.receiverType), ref.span));
     }
   }
   return diagnostics;
+}
+
+function nativeMethodDiagnostic(name: string, receiverType: FormulaValueType | "any" | undefined): string {
+  const type = nativeRuntimeTypeName(receiverType);
+  return type ? `Cannot find function "${name}" on type ${type}` : `Cannot find function "${name}"`;
+}
+
+function nativeMemberDiagnostic(name: string, receiverType: FormulaValueType | "any" | undefined): string {
+  const type = nativeRuntimeTypeName(receiverType);
+  return type ? `Cannot find "${name}" on type ${type}` : `Cannot find "${name}"`;
+}
+
+function nativeRuntimeTypeName(type: FormulaValueType | "any" | undefined): string | null {
+  switch (type) {
+    case "null":
+      return "Null";
+    case "boolean":
+      return "Boolean";
+    case "number":
+      return "Number";
+    case "string":
+      return "String";
+    case "date":
+      return "Date";
+    case "duration":
+      return "Duration";
+    case "list":
+      return "List";
+    case "object":
+      return "Object";
+    case "file":
+      return "File";
+    case "link":
+      return "Link";
+    case "regexp":
+      return "RegExp";
+    case "html":
+      return "HTML";
+    case "image":
+      return "Image";
+    case "icon":
+      return "Icon";
+    case "error":
+      return "Error";
+    default:
+      return null;
+  }
+}
+
+function shouldValidateMember(expr: Extract<Expression, { type: "Member" }>, schema: FormulaLanguageSchema): boolean {
+  if (expr.computed || typeof expr.property !== "string") return false;
+  if (expr.object.type === "Identifier" && ["note", "file", "formula"].includes(expr.object.name)) return false;
+  const objectPath = objectPathFromExpression(expr);
+  if (objectPath && schema.objects?.some((object) => object.name === objectPath[0])) return false;
+  const receiverType = inferExpressionType(expr.object, schema);
+  return receiverType !== "any" && receiverType !== "object" && receiverType !== "error";
+}
+
+function memberIsAvailable(receiverType: FormulaValueType | "any" | undefined, name: string): boolean {
+  if (!receiverType || receiverType === "any" || receiverType === "object") return true;
+  if (getMethodFunction(name, receiverType)) return true;
+  switch (receiverType) {
+    case "string":
+    case "list":
+      return name === "length";
+    case "date":
+      return ["year", "month", "day", "hour", "minute", "second", "millisecond"].includes(name);
+    case "file":
+      return Boolean(getFileProperty(name));
+    default:
+      return false;
+  }
+}
+
+function typeDiagnostics(ast: Expression, schema: FormulaLanguageSchema): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const visit = (expr: Expression): void => {
+    switch (expr.type) {
+      case "Binary":
+        diagnostics.push(...binaryTypeDiagnostics(expr, schema));
+        visit(expr.left);
+        visit(expr.right);
+        break;
+      case "Call":
+        diagnostics.push(...callTypeDiagnostics(expr, schema));
+        visit(expr.callee);
+        expr.args.forEach(visit);
+        break;
+      case "Array":
+        expr.elements.forEach(visit);
+        break;
+      case "Object":
+        expr.properties.forEach((property) => visit(property.value));
+        break;
+      case "Unary":
+        visit(expr.argument);
+        break;
+      case "Member":
+        visit(expr.object);
+        if (expr.computed && typeof expr.property !== "string") visit(expr.property);
+        break;
+      case "Identifier":
+      case "Literal":
+      case "Regex":
+        break;
+    }
+  };
+  visit(ast);
+  return diagnostics;
+}
+
+function binaryTypeDiagnostics(expr: Extract<Expression, { type: "Binary" }>, schema: FormulaLanguageSchema): Diagnostic[] {
+  if (!["==", "!=", ">", "<", ">=", "<="].includes(expr.operator)) return [];
+  const leftType = inferExpressionType(expr.left, schema);
+  const rightType = inferExpressionType(expr.right, schema);
+  return [
+    comparisonTypeDiagnostic(leftType, expr.right),
+    comparisonTypeDiagnostic(rightType, expr.left),
+  ].filter((diagnostic): diagnostic is Diagnostic => Boolean(diagnostic));
+}
+
+function callTypeDiagnostics(expr: Extract<Expression, { type: "Call" }>, schema: FormulaLanguageSchema): Diagnostic[] {
+  const fn = functionForCallExpression(expr, schema);
+  if (!fn) return [];
+  const diagnostics: Diagnostic[] = [];
+  expr.args.forEach((arg, index) => {
+    const parameter = fn.parameters?.[Math.min(index, Math.max(0, fn.parameters.length - 1))];
+    const expectedTypes = expectedTypesFromParameter(parameter);
+    const diagnostic = argumentTypeDiagnostic(expectedTypes, arg, schema);
+    if (diagnostic) diagnostics.push(diagnostic);
+  });
+  return diagnostics;
+}
+
+function functionForCallExpression(expr: Extract<Expression, { type: "Call" }>, schema: FormulaLanguageSchema): FunctionCompletion | FunctionMetadata | undefined {
+  if (expr.callee.type === "Identifier") {
+    const name = expr.callee.name;
+    return getGlobalFunction(name) ?? schema.functions?.find((fn) => fn.name === name);
+  }
+  if (expr.callee.type === "Member" && !expr.callee.computed && typeof expr.callee.property === "string") {
+    const receiverType = inferExpressionType(expr.callee.object, schema);
+    return getMethodFunction(expr.callee.property, receiverType);
+  }
+  return undefined;
+}
+
+function comparisonTypeDiagnostic(expectedType: FormulaValueType | "any", actual: Expression): Diagnostic | null {
+  if (expectedType === "any" || expectedType === "null" || expectedType === "error") return null;
+  if (literalMatchesExpectedType(actual, [expectedType])) return null;
+  if (actual.type !== "Literal" && actual.type !== "Regex") return null;
+  return warning(
+    "type-mismatch",
+    `Expected ${expectedType} value, got ${literalTypeName(actual)}`,
+    actual.span,
+  );
+}
+
+function argumentTypeDiagnostic(expectedTypes: string[], actual: Expression, schema: FormulaLanguageSchema): Diagnostic | null {
+  if (!expectedTypes.length || expectedTypes.includes("any") || expectedTypes.includes("value")) return null;
+  if (literalMatchesExpectedType(actual, expectedTypes)) return null;
+  if (actual.type !== "Literal" && actual.type !== "Regex") {
+    const actualType = inferExpressionType(actual, schema);
+    if (actualType === "any" || expectedTypes.includes(actualType)) return null;
+    return null;
+  }
+  return warning(
+    "type-mismatch",
+    `Expected ${formatExpectedTypes(expectedTypes)} value, got ${literalTypeName(actual)}`,
+    actual.span,
+  );
+}
+
+function literalMatchesExpectedType(expr: Expression, expectedTypes: readonly string[]): boolean {
+  if (expectedTypes.includes("any") || expectedTypes.includes("value")) return true;
+  if (expr.type === "Regex") return expectedTypes.includes("regexp");
+  if (expr.type !== "Literal") return true;
+  const actualType = expr.value === null ? "null" : typeof expr.value === "boolean" ? "boolean" : typeof expr.value === "number" ? "number" : "string";
+  if (expectedTypes.includes(actualType)) {
+    if (expectedTypes.includes("date") && actualType === "string") return isDateLiteral(String(expr.value));
+    if (expectedTypes.includes("duration") && actualType === "string") return String(expr.value).trim().length > 0;
+    return true;
+  }
+  if (actualType === "string" && expectedTypes.includes("number")) return Number.isFinite(Number(expr.value));
+  if (actualType === "string" && expectedTypes.includes("boolean")) return ["true", "false"].includes(String(expr.value).toLowerCase());
+  if (actualType === "string" && expectedTypes.includes("date")) return isDateLiteral(String(expr.value));
+  return false;
+}
+
+function literalTypeName(expr: Expression): string {
+  if (expr.type === "Regex") return "regexp";
+  if (expr.type !== "Literal") return "expression";
+  return expr.value === null ? "null" : typeof expr.value;
+}
+
+function formatExpectedTypes(expectedTypes: string[]): string {
+  return expectedTypes.join(" or ");
+}
+
+function isDateLiteral(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}(?:[T ][0-2]\d:[0-5]\d(?::[0-5]\d)?)?$/.test(value);
 }
 
 function collectReferences(ast: Expression, schema: FormulaLanguageSchema): Reference[] {
@@ -345,6 +904,14 @@ function collectReferences(ast: Expression, schema: FormulaLanguageSchema): Refe
           if (expr.object.name === "note") refs.push({ kind: "note-property", name: expr.property, span: propertySpan(expr) });
           else if (expr.object.name === "file") refs.push({ kind: "file-property", name: expr.property, span: propertySpan(expr) });
           else if (expr.object.name === "formula") refs.push({ kind: "formula-property", name: expr.property, span: propertySpan(expr) });
+        }
+        if (shouldValidateMember(expr, schema)) {
+          refs.push({
+            kind: "member",
+            name: expr.property as string,
+            receiverType: inferExpressionType(expr.object, schema),
+            span: propertySpan(expr),
+          });
         }
         visit(expr.object);
         if (expr.computed && typeof expr.property !== "string") visit(expr.property);
@@ -512,6 +1079,27 @@ function propertyToCompletion(property: PropertyCompletion | PropertyMetadata): 
   return item;
 }
 
+function propertyValueToCompletion(
+  value: PropertyValueCompletion,
+  property: PropertyCompletion,
+  quoted: boolean,
+): CompletionItem {
+  const label = value.label ?? valueLabel(value.value);
+  const item: CompletionItem = {
+    label,
+    kind: "value",
+    insertText: value.insertText ?? valueInsertText(value.value, value.type ?? property.type, quoted),
+    value: value.value,
+  };
+  const detailParts = [
+    value.detail ?? value.type ?? property.type,
+    value.count ? `${value.count} match${value.count === 1 ? "" : "es"}` : "",
+  ].filter((part): part is string => Boolean(part));
+  if (detailParts.length) item.detail = detailParts.join(" · ");
+  if (value.documentation) item.documentation = value.documentation;
+  return item;
+}
+
 function functionToCompletion(fn: FunctionCompletion | FunctionMetadata): CompletionItem {
   return {
     label: fn.name,
@@ -524,6 +1112,108 @@ function functionToCompletion(fn: FunctionCompletion | FunctionMetadata): Comple
 
 function keywordToCompletion(keyword: string): CompletionItem {
   return { label: keyword, kind: "keyword", insertText: keyword };
+}
+
+function valuePrefixBeforeCursor(source: string, position: number): ValuePrefixInfo {
+  const before = source.slice(0, position);
+  const quoteIndex = lastOpenQuoteIndex(before);
+  if (quoteIndex >= 0) {
+    return {
+      beforeValue: before.slice(0, quoteIndex),
+      prefix: before.slice(quoteIndex + 1),
+      quoted: true,
+      from: quoteIndex + 1,
+      to: position,
+    };
+  }
+
+  const match = before.match(/[^\s,)\]}]*$/);
+  const prefix = match?.[0] ?? "";
+  return {
+    beforeValue: before.slice(0, before.length - prefix.length),
+    prefix,
+    quoted: false,
+    from: position - prefix.length,
+    to: position,
+  };
+}
+
+function propertyExpressionBeforeValue(beforeValue: string): string | null {
+  const propertyPattern = String.raw`([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*|note\[(?:"[^"]+"|'[^']+')\])`;
+  const comparison = beforeValue.match(new RegExp(`${propertyPattern}\\s*(?:==|!=|>=|<=|>|<)\\s*$`));
+  if (comparison) return comparison[1] ?? null;
+  const method = beforeValue.match(new RegExp(`${propertyPattern}\\.(?:contains|startsWith|endsWith|hasTag|hasLink|linksTo)\\(\\s*$`));
+  return method?.[1] ?? null;
+}
+
+function propertyForValueExpression(expression: string, schema: FormulaLanguageSchema): PropertyCompletion | undefined {
+  const bracketProperty = expression.match(/^note\[(["'])(.*)\1\]$/);
+  if (bracketProperty) return schema.properties?.find((property) => property.name === bracketProperty[2]);
+  if (expression.startsWith("note.")) return schema.properties?.find((property) => property.name === expression.slice("note.".length));
+  if (expression.startsWith("formula.")) return schema.formulas?.find((property) => property.name === expression.slice("formula.".length));
+  const path = expression.split(".");
+  if (path.length > 1) return objectPropertyByPath(path, schema);
+  return schema.properties?.find((property) => property.name === expression);
+}
+
+function lastOpenQuoteIndex(source: string): number {
+  let quote: string | null = null;
+  let quoteIndex = -1;
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index]!;
+    if ((char === "\"" || char === "'") && !isEscaped(source, index)) {
+      if (quote === char) {
+        quote = null;
+        quoteIndex = -1;
+      } else if (!quote) {
+        quote = char;
+        quoteIndex = index;
+      }
+    }
+  }
+  return quoteIndex;
+}
+
+function isEscaped(source: string, index: number): boolean {
+  let slashCount = 0;
+  for (let cursor = index - 1; cursor >= 0 && source[cursor] === "\\"; cursor -= 1) slashCount += 1;
+  return slashCount % 2 === 1;
+}
+
+function scoreCompletionValue(item: CompletionItem, prefix: string): number {
+  const label = item.label.toLowerCase();
+  const detail = item.detail?.toLowerCase() ?? "";
+  if (!prefix) return Number(item.detail?.match(/(\d+) match/)?.[1] ?? 1);
+  if (label === prefix) return 1000;
+  if (label.startsWith(prefix)) return 800;
+  if (label.includes(prefix)) return 400;
+  if (detail.includes(prefix)) return 100;
+  return 0;
+}
+
+function valueLabel(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (value === null) return "null";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(value);
+}
+
+function valueInsertText(value: unknown, type: FormulaValueType | string | undefined, quoted: boolean): string {
+  if (quoted) return valueLabel(value);
+  if (value === null || value === undefined) return "null";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "null";
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (Array.isArray(value)) return `[${value.map((item) => valueInsertText(item, undefined, false)).join(", ")}]`;
+  const text = valueLabel(value);
+  if (type === "number") {
+    const numberValue = Number(text);
+    return Number.isFinite(numberValue) ? String(numberValue) : "null";
+  }
+  if (type === "boolean") {
+    const normalized = text.toLowerCase();
+    if (normalized === "true" || normalized === "false") return normalized;
+  }
+  return JSON.stringify(text);
 }
 
 function hoverFromProperty(property: PropertyCompletion | PropertyMetadata, span: Span): HoverInfo {
@@ -555,9 +1245,7 @@ function getPrefix(source: string, position: number): string {
 }
 
 function getReceiverExpression(source: string, position: number): string | null {
-  const before = source.slice(0, position);
-  const match = before.match(/([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\.\w*$/);
-  return match?.[1] ?? null;
+  return memberCompletionContext(source, position)?.receiverExpression ?? null;
 }
 
 function wordAt(source: string, position: number): { text: string; span: Span } | null {
@@ -590,6 +1278,10 @@ function dedupe(items: CompletionItem[]): CompletionItem[] {
 
 function unique(values: string[]): string[] {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))];
 }
 
 export {

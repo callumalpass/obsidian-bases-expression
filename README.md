@@ -4,7 +4,7 @@
 
 It is meant for projects that want behavior compatible with the observed Obsidian Bases runtime without depending on Obsidian internals: command-line tools, tests, workflow engines, companion plugins, and Obsidian plugins that need to evaluate or validate user-authored expressions outside the native Bases view.
 
-The package is headless. It does not ship a visual filter composer, a settings UI, or any Obsidian view components.
+The core package is headless. It does not ship Obsidian view components directly. Use the companion `obsidian-bases-expression-builder` package when you want a native Obsidian expression-builder UI.
 
 ## What It Provides
 
@@ -12,6 +12,7 @@ The package is headless. It does not ship a visual filter composer, a settings U
 - Context builders for note properties, file metadata, links, formulas, and host-provided objects.
 - Structured filter evaluation for Bases-style `and`, `or`, and `not` trees.
 - Diagnostics, dependency inspection, completions, hover info, signature help, and CodeMirror-shaped adapters.
+- Headless builder primitives for condition/group trees, type-aware operators, serialization, simple-expression parsing, and validation.
 - Conservative note-creation default inference from positive filters.
 - Oracle-backed compatibility tests against a running Obsidian app.
 
@@ -178,7 +179,14 @@ import {
 
 const schema: FormulaLanguageSchema = {
   properties: [
-    { name: "status", type: "string" },
+    {
+      name: "status",
+      type: "string",
+      values: [
+        { value: "Todo", label: "Todo", count: 3 },
+        { value: "Done", label: "Done", count: 1 },
+      ],
+    },
     { name: "priority", type: "number" },
     { name: "due", type: "date" },
   ],
@@ -220,7 +228,79 @@ Available tooling includes:
 - `toCodeMirrorCompletions()`
 - `toCodeMirrorDiagnostics()`
 
+Completions are context-aware. In value positions such as `status == "T`, `completeExpression()` can return schema-backed value suggestions with replacement ranges. In typed positions such as `due < ` or `priority.round(`, it suggests compatible properties, literals, and functions instead of the full global list. Validation also reports conservative `type-mismatch` warnings for obvious literal mistakes while allowing common coercions such as numeric strings and ISO date strings.
+
 These APIs are enough for consumers to build their own expression editors or filter builders, but this package intentionally does not include one.
+
+## Builder Primitives
+
+The core package includes a headless builder model for plugins and tools that want to store or edit expressions as structured UI state before serializing them back to Bases syntax.
+
+```ts
+import {
+  createBuilderCondition,
+  createBuilderGroup,
+  serializeBuilderNode,
+  validateBuilderNode,
+  type FormulaLanguageSchema,
+} from "obsidian-bases-expression";
+
+const schema: FormulaLanguageSchema = {
+  properties: [
+    {
+      name: "status",
+      type: "string",
+      values: [
+        { value: "Todo", label: "Todo" },
+        { value: "Done", label: "Done" },
+      ],
+    },
+    { name: "priority", type: "number" },
+  ],
+};
+
+const filter = createBuilderGroup([
+  createBuilderCondition("status", "is", "Todo"),
+  createBuilderCondition("priority", "greater-than-or-equal", 2),
+]);
+
+console.log(serializeBuilderNode(filter, { schema }));
+// (status == "Todo") && (priority >= 2)
+
+console.log(validateBuilderNode(filter, schema).valid);
+```
+
+Builder APIs include:
+
+- `getBuilderProperties()` to flatten note, file, formula, and object schema properties.
+- `getBuilderOperatorsForType()` for type-aware operator menus.
+- `serializeBuilderNode()` and `builderNodeToFilterExpression()` for expression and structured-filter output.
+- `parseBuilderNode()` for converting simple expression strings back into editable rows.
+- `validateBuilderNode()` and `evaluateBuilderNode()` for diagnostics and optional runtime warnings.
+
+## Obsidian Builder Package
+
+`obsidian-bases-expression-builder` provides native Obsidian UI helpers on top of this core package. It declares `obsidian`, CodeMirror, and `obsidian-bases-expression` as peer dependencies.
+
+```ts
+import {
+  BasesExpressionBuilderModal,
+  collectObsidianBasesSchema,
+} from "obsidian-bases-expression-builder";
+import "obsidian-bases-expression-builder/styles.css";
+
+new BasesExpressionBuilderModal(this.app, {
+  schema: collectObsidianBasesSchema(this.app),
+  initialExpression: 'status == "Todo"',
+  onApply: ({ source, filter, validation }) => {
+    console.log(source, filter, validation.valid);
+  },
+}).open();
+```
+
+`collectObsidianBasesSchema()` also collects bounded value suggestions from frontmatter by default. Use `maxValuesPerProperty` to cap distinct values per property and `maxPreviewLength` to cap the example preview shown in property suggestions.
+
+The package also exports `BasesExpressionBuilder` for embedding in a custom view or settings tab, `BasesPropertySuggest`, `BasesOperatorSuggest`, `BasesValueSuggest`, and `BasesExpressionSuggest` for plain inputs, `getOperatorSuggestions()` / `getValueSuggestions()` for pure ranking, and `basesExpressionEditorExtensions()` / `basesExpressionSyntaxHighlighting()` for CodeMirror editors.
 
 ## Note-Creation Defaults
 
@@ -276,10 +356,12 @@ Compatibility is checked separately through an oracle generator in `scripts/`. W
 
 ```bash
 npm run oracle:generate
+npm run oracle:diagnostics:generate
 npm test
 ```
 
 The generated oracle fixture currently covers 281 live Obsidian cases, including literals, operators, functions, formulas, files, links, frontmatter links, relative markdown links, backlinks, duplicate basenames, and representative runtime errors.
+The diagnostics oracle fixture covers native parser validity, runtime error values, and validation-warning parity for targeted cases such as unknown typed members, missing note properties, and incomplete expressions.
 
 Known differences from the currently observed Obsidian runtime are recorded in `compatibilityProfile` and in the generated oracle fixture. Where docs and runtime disagree, this package defaults to runtime behavior. See [docs/compatibility.md](docs/compatibility.md) for details.
 

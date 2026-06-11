@@ -1,0 +1,9 @@
+{
+  "id": "bases-expression-builder-smoke",
+  "name": "Bases Expression Builder Smoke",
+  "version": "0.1.0",
+  "minAppVersion": "1.8.0",
+  "description": "Smoke-test plugin for obsidian-bases-expression-builder.",
+  "author": "Callum Alpass",
+  "isDesktopOnly": false
+}

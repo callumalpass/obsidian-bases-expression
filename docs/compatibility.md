@@ -36,9 +36,12 @@ Current verification commands:
 
 ```bash
 npm run oracle:generate
+npm run oracle:diagnostics:generate
 npm run docs:upstream:check
 npm run verify
 npm run build
 ```
 
 The test suite includes parser tests, evaluator tests across the documented function families, language-service tests, structured-filter and note-default inference tests, property-based arithmetic/list tests, and live oracle fixture tests. The current oracle corpus covers literals, property access, operators, globals, any/string/number/date/duration/list/object/regexp/file/link behavior, formula references, `this.file`, a dedicated wikilink/markdown-link/frontmatter/relative-path lookup matrix, and representative runtime errors. It does not repeat the same corpus across multiple Obsidian versions.
+
+The diagnostics oracle is a smaller, targeted fixture for parser validity and native runtime diagnostic shape. It locks down cases where Bases accepts an expression syntactically but evaluation produces an error value, such as `"asdf".asdfasdf`, while preserving null-tolerant behavior for missing note properties.

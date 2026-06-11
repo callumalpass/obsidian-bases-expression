@@ -1,9 +1,13 @@
 {
   "name": "obsidian-bases-expression",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Standalone parser, evaluator, diagnostics, and editor tooling for Obsidian Bases-compatible expressions.",
   "type": "module",
   "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "examples/dummy-obsidian-plugin"
+  ],
   "keywords": [
     "obsidian",
     "bases",
@@ -25,27 +29,40 @@
   "files": [
     "dist",
     "docs",
-    "examples",
+    "examples/*.ts",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:builder": "npm run build && tsc -p packages/obsidian/tsconfig.json && cp packages/obsidian/src/styles.css packages/obsidian/dist/styles.css",
+    "build:dummy": "node examples/dummy-obsidian-plugin/esbuild.config.mjs production",
+    "build:all": "npm run build && npm run build:builder && npm run build:dummy",
     "check": "tsc -p tsconfig.json --noEmit",
+    "check:builder": "npm run build && tsc -p packages/obsidian/tsconfig.json --noEmit",
+    "check:dummy": "npm run build:builder && tsc -p examples/dummy-obsidian-plugin/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "docs:upstream:check": "node scripts/check-obsidian-docs.mjs",
     "docs:upstream:update": "node scripts/check-obsidian-docs.mjs --update",
+    "oracle:diagnostics:generate": "node scripts/generate-diagnostic-fixtures.mjs",
     "oracle:generate": "node scripts/generate-oracle-fixtures.mjs",
-    "verify": "npm run check && npm test && npm run build"
+    "verify": "npm run check && npm run check:builder && npm run check:dummy && npm test && npm run build:all"
   },
   "dependencies": {
     "moment": "^2.30.1"
   },
   "devDependencies": {
+    "@codemirror/autocomplete": "^6.18.6",
+    "@codemirror/commands": "6.8.1",
+    "@codemirror/lint": "^6.8.5",
+    "@codemirror/state": "6.5.0",
+    "@codemirror/view": "6.38.6",
     "@types/node": "^24.0.0",
+    "esbuild": "^0.25.9",
     "fast-check": "^4.1.1",
+    "obsidian": "^1.8.7",
     "typescript": "^5.8.3",
     "vitest": "^3.2.0"
   }

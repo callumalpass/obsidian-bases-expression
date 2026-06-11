@@ -3,3 +3,5 @@ dist/
 coverage/
 .tmp/
 *.tsbuildinfo
+examples/dummy-obsidian-plugin/main.js
+examples/dummy-obsidian-plugin/styles.css

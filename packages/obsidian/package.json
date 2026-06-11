@@ -1,0 +1,50 @@
+{
+  "name": "obsidian-bases-expression-builder",
+  "version": "0.1.0",
+  "description": "Native Obsidian UI helpers for building, validating, and editing Obsidian Bases-compatible expressions.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "obsidian",
+    "bases",
+    "expression",
+    "builder",
+    "formula",
+    "codemirror"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "style": "./dist/styles.css",
+  "sideEffects": [
+    "./dist/styles.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@codemirror/autocomplete": "^6.0.0",
+    "@codemirror/commands": ">=6.8.0 <6.10.0",
+    "@codemirror/lint": "^6.0.0",
+    "@codemirror/state": "^6.0.0",
+    "@codemirror/view": "^6.0.0",
+    "obsidian": ">=1.8.0",
+    "obsidian-bases-expression": "^0.2.0"
+  },
+  "devDependencies": {
+    "obsidian-bases-expression": "file:../.."
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && cp src/styles.css dist/styles.css",
+    "check": "tsc -p tsconfig.json --noEmit"
+  }
+}

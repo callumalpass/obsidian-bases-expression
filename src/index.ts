@@ -97,6 +97,7 @@ export type {
   UnsupportedConstraint,
 } from "./inference.js";
 export {
+  completePropertyValues,
   completeExpression,
   createFormulaLanguageService,
   filePropertyMetadata,
@@ -124,6 +125,8 @@ export type {
   ObjectCompletion,
   ObjectPropertyCompletion,
   PropertyCompletion,
+  PropertyValueCompletion,
+  PropertyValueCompletionOptions,
   SignatureHelp,
   ValidationOptions,
 } from "./language-service.js";
@@ -136,3 +139,40 @@ export {
   methodFunctionMetadata as builtinMethodFunctions,
 } from "./metadata.js";
 export type { FormulaValueType, FunctionMetadata, PropertyMetadata } from "./metadata.js";
+export {
+  builderNodeToFilterExpression,
+  builderOperators,
+  createBuilderCondition,
+  createBuilderExpression,
+  createBuilderGroup,
+  createDefaultBuilderNode,
+  evaluateBuilderNode,
+  expressionToPropertyId,
+  findBuilderProperty,
+  formatExpressionLiteral,
+  getBuilderOperator,
+  getBuilderOperatorsForType,
+  getBuilderProperties,
+  parseBuilderNode,
+  propertyIdToExpression,
+  serializeBuilderNode,
+  validateBuilderNode,
+} from "./builder.js";
+export type {
+  BuilderCondition,
+  BuilderConjunction,
+  BuilderExpression,
+  BuilderGroup,
+  BuilderNode,
+  BuilderNodeKind,
+  BuilderOperator,
+  BuilderOperatorId,
+  BuilderOperatorValueKind,
+  BuilderParseResult,
+  BuilderProperty,
+  BuilderSchemaOptions,
+  BuilderSerializationOptions,
+  BuilderValidationIssue,
+  BuilderValidationResult,
+  BuilderValueSource,
+} from "./builder.js";

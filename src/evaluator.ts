@@ -291,7 +291,7 @@ export class Evaluator {
     if (receiver.type === "RegExp" && name === "matches") return boolValue(receiver.value.test(stringifyValue(this.eval(argExprs[0]!, scope))));
     if (receiver.type === "File") return this.callFile(receiver.value, name, argExprs.map((arg) => this.eval(arg, scope)));
     if (receiver.type === "Link") return this.callLink(receiver.value, name, argExprs.map((arg) => this.eval(arg, scope)));
-    return errorValue(`Function ${name} is not available on ${receiver.type}`);
+    return this.methodNotFound(receiver, name);
   }
 
   private callString(value: string, name: string, args: RuntimeValue[]): RuntimeValue {
@@ -330,7 +330,7 @@ export class Evaluator {
       case "trim":
         return stringValue(value.trim());
       default:
-        return errorValue(`Unknown string function ${name}`);
+        return this.methodNotFound("String", name);
     }
   }
 
@@ -350,7 +350,7 @@ export class Evaluator {
       case "toFixed":
         return stringValue(value.toFixed(this.asNumber(args[0] ?? numberValue(0))));
       default:
-        return errorValue(`Unknown number function ${name}`);
+        return this.methodNotFound("Number", name);
     }
   }
 
@@ -366,7 +366,7 @@ export class Evaluator {
       case "relative":
         return stringValue(m.from(moment(this.now)));
       default:
-        return errorValue(`Unknown date function ${name}`);
+        return this.methodNotFound("Date", name);
     }
   }
 
@@ -413,14 +413,14 @@ export class Evaluator {
       case "mean":
         return values.length ? numberValue(values.reduce((acc, value) => acc + this.asNumber(value), 0) / values.length) : nullValue();
       default:
-        return errorValue(`Unknown list function ${name}`);
+        return this.methodNotFound("List", name);
     }
   }
 
   private callObject(value: Record<string, RuntimeValue>, name: string): RuntimeValue {
     if (name === "keys") return listValue(Object.keys(value).map(stringValue));
     if (name === "values") return listValue(Object.values(value));
-    return errorValue(`Unknown object function ${name}`);
+    return this.methodNotFound("Object", name);
   }
 
   private callFile(value: FileValue, name: string, args: RuntimeValue[]): RuntimeValue {
@@ -442,7 +442,7 @@ export class Evaluator {
         return boolValue(value.folder === folder || value.folder.startsWith(`${folder}/`));
       }
       default:
-        return errorValue(`Unknown file function ${name}`);
+        return this.methodNotFound("File", name);
     }
   }
 
@@ -453,7 +453,7 @@ export class Evaluator {
       if (file.type !== "File") return errorValue("Could not coerce link to file");
       return this.callFile(file.value, "hasLink", args);
     }
-    return errorValue(`Unknown link function ${name}`);
+    return this.methodNotFound("Link", name);
   }
 
   private getProperty(object: RuntimeValue, property: string): RuntimeValue {
@@ -462,11 +462,11 @@ export class Evaluator {
         return nullValue();
       case "String":
         if (property === "length") return numberValue([...object.value].length);
-        return nullValue();
+        return this.memberNotFound("String", property);
       case "List":
         if (property === "length") return numberValue(object.value.length);
         if (/^-?\d+$/.test(property)) return object.value[Number(property)] ?? nullValue();
-        return nullValue();
+        return this.memberNotFound("List", property);
       case "Object":
         return object.value[property] ?? nullValue();
       case "Date":
@@ -474,9 +474,11 @@ export class Evaluator {
       case "File":
         return this.getFileField(object.value, property);
       case "Link":
-        return errorValue(`Cannot find "${property}" on type Link`);
+        return this.memberNotFound("Link", property);
+      case "Error":
+        return object;
       default:
-        return nullValue();
+        return this.memberNotFound(object.type, property);
     }
   }
 
@@ -498,7 +500,7 @@ export class Evaluator {
       case "millisecond":
         return numberValue(m.millisecond());
       default:
-        return nullValue();
+        return this.memberNotFound("Date", property);
     }
   }
 
@@ -530,8 +532,17 @@ export class Evaluator {
       case "file":
         return { type: "File", value };
       default:
-        return nullValue();
+        return this.memberNotFound("File", property);
     }
+  }
+
+  private memberNotFound(type: RuntimeValue["type"], property: string): RuntimeValue {
+    return errorValue(`Cannot find "${property}" on type ${type}`);
+  }
+
+  private methodNotFound(receiver: RuntimeValue | RuntimeValue["type"], name: string): RuntimeValue {
+    const type = typeof receiver === "string" ? receiver : receiver.type;
+    return errorValue(`Cannot find function "${name}" on type ${type}`);
   }
 
   private evalFormula(name: string): RuntimeValue {

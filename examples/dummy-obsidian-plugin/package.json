@@ -1,0 +1,13 @@
+{
+  "name": "bases-expression-builder-smoke-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "build": "node esbuild.config.mjs production"
+  },
+  "dependencies": {
+    "obsidian-bases-expression-builder": "file:../../packages/obsidian"
+  }
+}

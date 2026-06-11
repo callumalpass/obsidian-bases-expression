@@ -1,0 +1,216 @@
+{
+  "generatedAt": "2026-06-11T12:48:49.825Z",
+  "obsidian": {
+    "version": null,
+    "build": "3918dcecdc0934db"
+  },
+  "cases": [
+    {
+      "name": "unknown bare string member",
+      "expression": "\"asdf\".asdfasdf",
+      "native": {
+        "parse": {
+          "type": "object_access",
+          "parseError": null,
+          "errorMessage": null
+        },
+        "value": {
+          "error": "Cannot find \"asdfasdf\" on type String"
+        },
+        "thrown": null,
+        "testResult": null,
+        "testThrown": "Cannot find \"asdfasdf\" on type String"
+      }
+    },
+    {
+      "name": "unknown string method",
+      "expression": "\"asdf\".asdfasdf()",
+      "native": {
+        "parse": {
+          "type": "function",
+          "parseError": null,
+          "errorMessage": null
+        },
+        "value": {
+          "error": "Cannot find function \"asdfasdf\" on type String"
+        },
+        "thrown": null,
+        "testResult": null,
+        "testThrown": "Cannot find function \"asdfasdf\" on type String"
+      }
+    },
+    {
+      "name": "known bare string field",
+      "expression": "\"asdf\".length",
+      "native": {
+        "parse": {
+          "type": "object_access",
+          "parseError": null,
+          "errorMessage": null
+        },
+        "value": 4,
+        "thrown": null,
+        "testResult": true,
+        "testThrown": null
+      }
+    },
+    {
+      "name": "known string method",
+      "expression": "\"asdf\".lower()",
+      "native": {
+        "parse": {
+          "type": "function",
+          "parseError": null,
+          "errorMessage": null
+        },
+        "value": "asdf",
+        "thrown": null,
+        "testResult": true,
+        "testThrown": null
+      }
+    },
+    {
+      "name": "unknown bare date member",
+      "expression": "now().asdfasdf",
+      "native": {
+        "parse": {
+          "type": "object_access",
+          "parseError": null,
+          "errorMessage": null
+        },
+        "value": {
+          "error": "Cannot find \"asdfasdf\" on type Date"
+        },
+        "thrown": null,
+        "testResult": null,
+        "testThrown": "Cannot find \"asdfasdf\" on type Date"
+      }
+    },
+    {
+      "name": "known bare date field",
+      "expression": "now().year",
+      "native": {
+        "parse": {
+          "type": "object_access",
+          "parseError": null,
+          "errorMessage": null
+        },
+        "value": 2026,
+        "thrown": null,
+        "testResult": true,
+        "testThrown": null
+      }
+    },
+    {
+      "name": "unknown bare number member",
+      "expression": "(1).asdfasdf",
+      "native": {
+        "parse": {
+          "type": "object_access",
+          "parseError": null,
+          "errorMessage": null
+        },
+        "value": {
+          "error": "Cannot find \"asdfasdf\" on type Number"
+        },
+        "thrown": null,
+        "testResult": null,
+        "testThrown": "Cannot find \"asdfasdf\" on type Number"
+      }
+    },
+    {
+      "name": "known number method",
+      "expression": "(1.2).round()",
+      "native": {
+        "parse": {
+          "type": "function",
+          "parseError": null,
+          "errorMessage": null
+        },
+        "value": 1,
+        "thrown": null,
+        "testResult": true,
+        "testThrown": null
+      }
+    },
+    {
+      "name": "unknown bare file member",
+      "expression": "file.asdfasdf",
+      "native": {
+        "parse": {
+          "type": "object_access",
+          "parseError": null,
+          "errorMessage": null
+        },
+        "value": {
+          "error": "Cannot find \"asdfasdf\" on type File"
+        },
+        "thrown": null,
+        "testResult": null,
+        "testThrown": "Cannot find \"asdfasdf\" on type File"
+      }
+    },
+    {
+      "name": "known bare file field",
+      "expression": "file.name",
+      "native": {
+        "parse": {
+          "type": "object_access",
+          "parseError": null,
+          "errorMessage": null
+        },
+        "value": "row",
+        "thrown": null,
+        "testResult": true,
+        "testThrown": null
+      }
+    },
+    {
+      "name": "unknown global function",
+      "expression": "doesNotExist()",
+      "native": {
+        "parse": {
+          "type": "function",
+          "parseError": null,
+          "errorMessage": null
+        },
+        "value": {
+          "error": "Cannot find function \"doesNotExist\""
+        },
+        "thrown": null,
+        "testResult": null,
+        "testThrown": "Cannot find function \"doesNotExist\""
+      }
+    },
+    {
+      "name": "invalid incomplete comparison",
+      "expression": "status ==",
+      "native": {
+        "parse": {
+          "type": "invalid",
+          "parseError": "Unable to parse formula. (position 0)",
+          "errorMessage": "Unable to parse formula. (position 0)"
+        },
+        "value": null,
+        "thrown": null,
+        "testResult": false,
+        "testThrown": null
+      }
+    },
+    {
+      "name": "missing note property",
+      "expression": "missing",
+      "native": {
+        "parse": {
+          "type": "ident",
+          "parseError": null,
+          "errorMessage": null
+        },
+        "value": null,
+        "thrown": null,
+        "testResult": false,
+        "testThrown": null
+      }
+    }
+  ]
+}
