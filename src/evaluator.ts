@@ -54,6 +54,13 @@ type Scope = Record<string, RuntimeValue>;
 export function evaluateExpression(sourceOrAst: string | Expression, context: EvaluationContext = {}): EvaluationResult {
   const parsed = typeof sourceOrAst === "string" ? parseExpression(sourceOrAst) : { ast: sourceOrAst, diagnostics: [], tokens: [] };
   if (!parsed.ast || parsed.diagnostics.some((d) => d.severity === "error")) {
+    if (parsed.diagnostics.some((diagnostic) => diagnostic.code === "unsupported-object-literal")) {
+      return {
+        value: nullValue(),
+        ast: parsed.ast,
+        diagnostics: parsed.diagnostics,
+      };
+    }
     return {
       value: errorValue(parsed.diagnostics[0]?.message ?? "Invalid expression"),
       ast: parsed.ast,

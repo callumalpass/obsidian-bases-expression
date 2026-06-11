@@ -80,8 +80,8 @@ describe("evaluateExpression", () => {
     expect(plain("[1,2,2,3].unique()")).toEqual([1, 2, 3]);
   });
 
-  it("evaluates objects, regexes, files, and links", () => {
-    expect(plain('{"a": 1, "b": 2}.keys()')).toEqual(["a", "b"]);
+  it("evaluates runtime objects, regexes, files, and links", () => {
+    expect(plain("nested.keys()")).toEqual(["a"]);
     expect(plain('/abc/.matches("abcde")')).toBe(true);
     expect(plain('file.hasTag("project")')).toBe(true);
     expect(plain('file.hasLink("Other.md")')).toBe(true);
@@ -97,6 +97,35 @@ describe("evaluateExpression", () => {
     expect(plain("max(1, 3, 2)")).toBe(3);
     expect(plain("min(1, 3, 2)")).toBe(1);
     expect(plain("random()")).toBe(0.25);
+  });
+
+  it("short-circuits lazy boolean and conditional branches", () => {
+    expect(plain("false && unknownFunction()")).toBe(false);
+    expect(plain("true || unknownFunction()")).toBe(true);
+    expect(plain("if(false, unknownFunction(), 'ok')")).toBe("ok");
+    expect(plain("if(true, 'ok', unknownFunction())")).toBe("ok");
+  });
+
+  it("pins truthiness and emptiness coercion", () => {
+    expect(plain("null.isTruthy()")).toBe(false);
+    expect(plain('("").isTruthy()')).toBe(false);
+    expect(plain("(0).isTruthy()")).toBe(false);
+    expect(plain("false.isTruthy()")).toBe(false);
+    expect(plain("[].isTruthy()")).toBe(true);
+    expect(plain("nested.isTruthy()")).toBe(true);
+    expect(plain("null.isEmpty()")).toBe(true);
+    expect(plain('("").isEmpty()')).toBe(true);
+    expect(plain("[].isEmpty()")).toBe(true);
+    expect(plain("nested.isEmpty()")).toBe(false);
+    expect(toPlain(evaluateExpression("{}", context).value)).toBeNull();
+  });
+
+  it("pins cross-type comparison and invalid coercion behavior", () => {
+    expect(plain('"2" < 10')).toBe(true);
+    expect(plain('"b" > "a"')).toBe(true);
+    expect(plain('date("not a date").toString()')).toBe("Invalid date");
+    expect(evaluateExpression('"abc" > 1', context).value.type).toBe("Error");
+    expect(evaluateExpression('duration("nope")', context).value.type).toBe("Error");
   });
 
   it("returns structured errors instead of throwing", () => {

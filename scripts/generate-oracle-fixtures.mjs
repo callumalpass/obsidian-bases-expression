@@ -176,21 +176,9 @@ const cases = [
   { name: "list unique strings", expression: '["a","b","a"].unique()' },
 
   // Object type.
-  {
-    name: "object keys",
-    expression: '{"a": 1, "b": 2}.keys()',
-    knownDivergence: "Public docs describe object literals, but the current internal parser rejects them.",
-  },
-  {
-    name: "object values",
-    expression: '{"a": 1, "b": 2}.values()',
-    knownDivergence: "Public docs describe object literals, but the current internal parser rejects them.",
-  },
-  {
-    name: "object isEmpty",
-    expression: '{"a": 1}.isEmpty()',
-    knownDivergence: "Public docs describe object literals, but the current internal parser rejects them.",
-  },
+  { name: "object keys", expression: '{"a": 1, "b": 2}.keys()' },
+  { name: "object values", expression: '{"a": 1, "b": 2}.values()' },
+  { name: "object isEmpty", expression: '{"a": 1}.isEmpty()' },
 
   // RegExp type.
   { name: "regex matches true", expression: '/abc/.matches("abcde")' },

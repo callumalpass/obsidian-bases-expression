@@ -53,6 +53,29 @@ describe("high-level evaluation API", () => {
     expect(evaluateToPlain('trigger.type == "drag" && trigger.zone.id == "next"', context)).toBe(true);
     expect(evaluateToPlain("steps.query.total", context)).toBe(3);
   });
+
+  it("keeps object roots separate from note fields and reserved names", () => {
+    const context = createEvaluationContext({
+      note: {
+        file: "note-file",
+        status: "Todo",
+        trigger: "frontmatter trigger",
+        values: ["note value"],
+      },
+      objects: {
+        file: { path: "Objects/File.md" },
+        trigger: { type: "drop", zone: { id: "next" } },
+        steps: { matches: [{ path: "Tasks/A.md" }] },
+        values: ["object value"],
+      },
+      file: { path: "Real/File.md" },
+    });
+    expect(evaluateToPlain("trigger.type", context)).toBe("drop");
+    expect(evaluateToPlain("trigger.zone.missing == null", context)).toBe(true);
+    expect(evaluateToPlain("steps.matches[0].path", context)).toBe("Tasks/A.md");
+    expect(evaluateToPlain("file.path", context)).toBe("Real/File.md");
+    expect(evaluateToPlain("values[0]", context)).toBe("note value");
+  });
 });
 
 describe("context builders", () => {
@@ -127,6 +150,19 @@ describe("filters and note-creation inference", () => {
     expect(filter.dependencies.noteProperties).toEqual(["priority", "status"]);
   });
 
+  it("short-circuits structured filters at runtime while preserving compile diagnostics", () => {
+    const context = createEvaluationContext({ note: { status: "Todo" } });
+    expect(compileFilter({ and: ["false", "unknownFunction()"] }).evaluateToBoolean(context)).toBe(false);
+    expect(compileFilter({ or: ["true", "unknownFunction()"] }).evaluateToBoolean(context)).toBe(true);
+    expect(compileFilter({ not: ["true", "true"] }).evaluateToBoolean(context)).toBe(false);
+    expect(compileFilter({ not: ["true", "false"] }).evaluateToBoolean(context)).toBe(true);
+
+    const filter = compileFilter({ or: ["true", "status +"] });
+    expect(filter.valid).toBe(false);
+    expect(filter.diagnostics.some((diagnostic) => diagnostic.severity === "error")).toBe(true);
+    expect(filter.evaluateToBoolean(context)).toBe(true);
+  });
+
   it("reports malformed structured filters", () => {
     const filter = compileFilter({ and: ["status"], or: ["priority"] });
     expect(filter.valid).toBe(false);
@@ -140,5 +176,23 @@ describe("filters and note-creation inference", () => {
     expect(inferred.properties).toEqual({ project: "Alpha", status: "Todo" });
     expect(inferred.tags).toEqual(["work"]);
     expect(inferred.unsupported).toEqual([]);
+  });
+
+  it("reports note-default inference boundaries", () => {
+    expect(inferDefaultsFromFilter('"Todo" == status').properties).toEqual({ status: "Todo" });
+    expect(inferDefaultsFromFilter("status").properties).toEqual({ status: true });
+
+    const conflict = inferDefaultsFromFilter({ and: ['status == "Todo"', 'status == "Done"'] });
+    expect(conflict.properties).toEqual({ status: "Todo" });
+    expect(conflict.unsupported.map((item) => item.reason)).toContain("Conflicting inferred defaults for status");
+
+    for (const filter of [
+      { or: ['status == "Todo"', 'status == "Done"'] },
+      { not: 'status == "Done"' },
+      "priority > 2",
+      "status.lower()",
+    ]) {
+      expect(inferDefaultsFromFilter(filter).unsupported.length).toBeGreaterThan(0);
+    }
   });
 });

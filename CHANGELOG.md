@@ -10,6 +10,10 @@
 - Added `inferDefaultsFromExpression()` and `inferDefaultsFromFilter()` for conservative note-creation defaults from positive equality and tag constraints.
 - Added oracle compatibility metadata fields for Obsidian version/build values when the generator can discover them.
 
+### Changed
+
+- Rejected object literal syntax by default to match the observed Obsidian Bases runtime. Object values from context data, such as `file.properties`, `note`, and host-provided `objects`, remain supported.
+
 ### Documentation
 
 - Documented public API boundaries for expressions, structured filters, object schemas, compatibility metadata, and note-default inference.

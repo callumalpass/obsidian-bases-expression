@@ -74,6 +74,10 @@ export function compileExpression(sourceOrAst: string | Expression): CompiledExp
 
   const evaluate = (context: EvaluationContext = {}, options: EvaluateOutputOptions = {}): EvaluationResult => {
     if (!parsed.ast || parsed.diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+      if (parsed.diagnostics.some((diagnostic) => diagnostic.code === "unsupported-object-literal")) {
+        const value = { type: "Null", value: null } as const;
+        return { value, ast: parsed.ast, diagnostics: parsed.diagnostics };
+      }
       const value = errorValue(parsed.diagnostics[0]?.message ?? "Invalid expression");
       const result = { value, ast: parsed.ast, diagnostics: parsed.diagnostics };
       assertEvaluationOk(result, options);

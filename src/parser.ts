@@ -7,7 +7,6 @@ import type {
   IdentifierExpression,
   LiteralExpression,
   MemberExpression,
-  ObjectExpression,
   RegexExpression,
   Span,
   UnaryExpression,
@@ -154,7 +153,7 @@ class Parser {
       return expr;
     }
     if (this.match("[")) return this.parseArray(token);
-    if (this.match("{")) return this.parseObject(token);
+    if (this.match("{")) return this.unsupportedObjectLiteral(token);
     this.error(token, `Expected expression, got ${JSON.stringify(token.raw || token.value)}`);
     if (!this.at("eof")) this.advance();
     return null;
@@ -231,34 +230,21 @@ class Parser {
     };
   }
 
-  private parseObject(open: Token): ObjectExpression {
-    const properties: ObjectExpression["properties"] = [];
-    if (!this.check("}")) {
-      while (true) {
-        const keyToken = this.current();
-        if (keyToken.type !== "identifier" && keyToken.type !== "string") {
-          this.error(keyToken, "Expected object key");
-          break;
-        }
-        this.advance();
-        this.expect(":", "Expected colon after object key");
-        const value = this.parseExpression(0);
-        if (value) {
-          properties.push({
-            key: keyToken.value,
-            value,
-            span: { start: keyToken.start, end: value.span.end },
-          });
-        }
-        if (!this.match(",")) break;
-      }
+  private unsupportedObjectLiteral(open: Token): null {
+    let depth = 1;
+    while (!this.at("eof") && depth > 0) {
+      const token = this.advance();
+      if (token.value === "{") depth++;
+      if (token.value === "}") depth--;
     }
-    const close = this.expect("}", "Expected closing object brace");
-    return {
-      type: "Object",
-      properties,
-      span: { start: open.start, end: close?.end ?? open.end },
-    };
+    const end = this.tokens[Math.max(0, this.i - 1)]?.end ?? open.end;
+    this.diagnostics.push({
+      code: "unsupported-object-literal",
+      message: "Object literals are not supported by the observed Obsidian Bases runtime",
+      severity: "error",
+      span: { start: open.start, end },
+    });
+    return null;
   }
 
   private match(value: string): boolean {

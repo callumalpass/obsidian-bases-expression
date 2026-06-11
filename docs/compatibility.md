@@ -1,6 +1,6 @@
 # Compatibility Notes
 
-This package is built from the published Obsidian Bases syntax and function documentation, then validated against a running Obsidian instance.
+This package is built from the published Obsidian Bases syntax and function documentation, then validated against a running Obsidian instance. When the docs and observed runtime behavior disagree, the package defaults to observed runtime behavior.
 
 ## Production boundary
 
@@ -14,7 +14,7 @@ Older checked-in oracle fixtures may have `null` Obsidian version/build values. 
 
 ## Observed docs/runtime divergence
 
-Object literals are documented as a data type in the public formula docs, but the parser observed in Obsidian currently rejects object literal expressions. The package implements object literals because they are documented. The generated oracle fixture marks this as a known divergence.
+Object values are documented in the public formula docs, including examples that use object literal syntax. The parser observed in Obsidian currently rejects object literal expressions such as `{"a": 1}.keys()`. The package follows the observed runtime and rejects object literals by default. Object methods still work on runtime-provided object values such as `file.properties`, `note`, and host-provided `objects`.
 
 Public docs show direct numeric method syntax such as `1.isTruthy()`, but the parser observed in Obsidian currently rejects direct numeric member calls. Parenthesized numeric literals such as `(1).isTruthy()` work.
 

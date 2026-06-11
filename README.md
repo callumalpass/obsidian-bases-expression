@@ -1,171 +1,295 @@
 # obsidian-bases-expression
 
-Standalone parser, evaluator, diagnostics, dependency inspection, and completion helpers for Obsidian Bases-compatible expressions.
+`obsidian-bases-expression` is a standalone TypeScript runtime for the expression language used by Obsidian Bases filters and formulas.
 
-The runtime is pure TypeScript and does not import Obsidian. Compatibility tests can optionally generate black-box fixtures from a running Obsidian instance through the Obsidian CLI.
+It is meant for projects that want behavior compatible with the observed Obsidian Bases runtime without depending on Obsidian internals: command-line tools, tests, workflow engines, companion plugins, and Obsidian plugins that need to evaluate or validate user-authored expressions outside the native Bases view.
 
-```ts
-import { evaluateExpression } from "obsidian-bases-expression";
+The package is headless. It does not ship a visual filter composer, a settings UI, or any Obsidian view components.
 
-const result = evaluateExpression('status == "Todo" && due < today()', {
-  note: {
-    status: "Todo",
-    due: "2026-06-09",
-  },
-  now: "2026-06-10T12:00:00",
-});
+## What It Provides
 
-console.log(result.value);
+- A parser and evaluator for Bases-style expressions.
+- Context builders for note properties, file metadata, links, formulas, and host-provided objects.
+- Structured filter evaluation for Bases-style `and`, `or`, and `not` trees.
+- Diagnostics, dependency inspection, completions, hover info, signature help, and CodeMirror-shaped adapters.
+- Conservative note-creation default inference from positive filters.
+- Oracle-backed compatibility tests against a running Obsidian app.
+
+## Why This Exists
+
+Obsidian Bases expressions are useful outside `.base` files. The same expression model can describe:
+
+- whether a note belongs in a view
+- whether a saved search or dashboard should include a file
+- whether an automation rule should run for a note
+- which properties a newly created note needs so it remains visible in a filtered view
+- how a CLI or test runner should evaluate Bases-like configuration
+
+This package keeps those concerns on a shared expression contract instead of each consumer inventing its own mini-language.
+
+## Install
+
+```bash
+npm install obsidian-bases-expression
 ```
 
-## Design constraints
-
-- Implemented from the published Obsidian Bases documentation.
-- No production dependency on Obsidian private APIs.
-- Test-only oracle generation validates behavior against a running Obsidian app.
-- Parser and diagnostics preserve source ranges for editor integrations.
-
-Public sources used for the implementation surface:
-
-- Obsidian Bases syntax: https://help.obsidian.md/bases/syntax
-- Obsidian Bases functions: https://help.obsidian.md/bases/functions
-- Obsidian formulas overview: https://help.obsidian.md/formulas
-
-## Current compatibility scope
-
-Implemented:
-
-- literals: strings, numbers, booleans, `null`, lists, objects, regular expressions
-- operators: arithmetic, comparison, boolean, unary, grouping
-- property access: bare note fields, `note.*`, `file.*`, `formula.*`, `this.*`, bracket access, list indexes
-- host-provided object roots such as `trigger.*` or `steps.*` when supplied in the evaluation context
-- global functions documented by Obsidian Bases
-- typed functions for strings, numbers, dates, lists, links, files, objects, and regexes
-- list `map`, `filter`, and `reduce` with `value`, `index`, and `acc`
-- diagnostics, dependency inspection, completions, hover info, and signature help
-- Bases-style structured filters with `and`, `or`, and `not`
-- conservative note-default inference for note creation flows
-
-The package intentionally returns structured `ErrorValue` objects for unsupported or invalid runtime operations instead of throwing in normal evaluation.
-
-## API
+## Quick Start
 
 ```ts
 import {
-  compileFilter,
   compileExpression,
-  completeExpression,
-  createContextFromRow,
   createEvaluationContext,
-  evaluateExpression,
   evaluateToPlain,
-  inferDefaultsFromFilter,
-  inspectExpression,
-  toCodeMirrorCompletions,
-  parseExpression,
-  validateExpression,
-  validateExpressionDetailed,
 } from "obsidian-bases-expression";
 
-const parsed = parseExpression('status == "Todo" && file.hasTag("work")');
-const diagnostics = validateExpression("status == unknown", {
-  properties: [{ name: "status", type: "string" }],
-});
-const completions = completeExpression("file.pa", 7);
-const inspection = inspectExpression("formula.score + priority");
-
-const result = evaluateExpression("price * quantity", {
-  note: { price: 12.5, quantity: 4 },
-  file: { path: "Projects/Example.md" },
-  objects: {
-    trigger: { type: "drag", zone: { id: "doing" } },
-    steps: { query: { total: 3 } },
+const context = createEvaluationContext({
+  note: {
+    status: "Todo",
+    priority: 3,
+  },
+  file: {
+    path: "Tasks/Write proposal.md",
+    tags: ["work", "project/client-a"],
   },
 });
+
+const visible = evaluateToPlain(
+  'status == "Todo" && file.hasTag("project")',
+  context,
+);
+
+const predicate = compileExpression("priority >= 2");
+const important = predicate.evaluateToPlain(context);
+
+console.log({ visible, important });
 ```
 
-Higher-level helpers are available for plugin and workflow authors:
+## Expressions
+
+The runtime follows observed Obsidian Bases behavior when the public docs and the app differ.
+
+Supported expression features include:
+
+- literals: strings, numbers, booleans, `null`, lists, and regular expressions
+- operators: arithmetic, comparison, boolean logic, unary operators, and grouping
+- property access: bare note fields, `note.*`, `file.*`, `formula.*`, `this.*`, brackets, and list indexes
+- global functions such as `date()`, `today()`, `number()`, `link()`, `file()`, `list()`, `min()`, and `max()`
+- typed methods for strings, numbers, dates, durations, lists, objects, regexes, files, and links
+- list `map`, `filter`, and `reduce` using `value`, `index`, and `acc`
+
+Object values are supported when they come from the runtime context, such as `file.properties`, `note`, or host-provided `objects`. Object literal syntax such as `{"a": 1}` is rejected to match the observed Obsidian Bases parser.
+
+Runtime failures return structured error values during normal evaluation. Use `throwOnError` when integrating with code paths that should fail fast.
+
+```ts
+import { evaluateToPlain } from "obsidian-bases-expression";
+
+evaluateToPlain("number('nope')", {}, { throwOnError: true });
+```
+
+## Evaluation Contexts
+
+Expressions operate on plain JavaScript data. `createEvaluationContext()` normalizes the common Obsidian-shaped pieces:
+
+```ts
+import { createEvaluationContext, evaluateToPlain } from "obsidian-bases-expression";
+
+const context = createEvaluationContext({
+  note: {
+    due: "2026-06-12",
+    project: "[[Client A]]",
+  },
+  propertyTypes: {
+    due: "date",
+    project: "link",
+  },
+  file: {
+    path: "Tasks/Follow up.md",
+    links: [{ path: "Client A", resolvedPath: "Projects/Client A.md" }],
+  },
+  files: [{ path: "Projects/Client A.md" }],
+});
+
+const result = evaluateToPlain(
+  'due < today() || project.asFile().folder == "Projects"',
+  context,
+);
+```
+
+Host applications can also provide named object roots. These are useful for workflow events, canvas zones, action results, or other data that should not be treated as note frontmatter.
 
 ```ts
 const context = createEvaluationContext({
-  note: { status: "Todo", priority: 3 },
-  file: {
-    path: "Tasks/Write proposal.md",
-    tags: ["project/client-a"],
+  note: { status: "Todo" },
+  objects: {
+    trigger: { type: "drag", zone: { id: "doing" } },
+    steps: { query: { total: 4 } },
   },
 });
 
-const activeZonePredicate = compileExpression('status == "Todo" && file.hasTag("project")');
-const shouldRender = activeZonePredicate.evaluateToPlain(context);
+evaluateToPlain(
+  'trigger.type == "drag" && trigger.zone.id == "doing" && steps.query.total > 0',
+  context,
+);
+```
 
-const viewFilter = compileFilter({
-  and: ['status == "Todo"', { or: ['priority >= 2', 'file.hasTag("urgent")'] }],
-});
-const matchesView = viewFilter.evaluateToBoolean(context);
+Reserved roots such as `file`, `note`, `formula`, `this`, and `values` keep their Bases meaning.
 
-const defaults = inferDefaultsFromFilter({
-  and: ['status == "Todo"', 'note.project == "Client A"', 'file.hasTag("work")'],
-});
-// { properties: { status: "Todo", project: "Client A" }, tags: ["work"] }
+## Structured Filters
 
-const plain = evaluateToPlain("priority + 1", context);
-const rowContext = createContextFromRow({
-  path: "Tasks/Write proposal.md",
-  properties: { status: "Todo", priority: 3 },
-});
+Bases filters are either expression strings or recursive filter objects. `compileFilter()` evaluates that shape directly:
 
-const validation = validateExpressionDetailed("due.lower()", {
-  properties: [{ name: "due", type: "date" }],
-  objects: [
+```ts
+import { compileFilter, createEvaluationContext } from "obsidian-bases-expression";
+
+const filter = compileFilter({
+  and: [
+    'status == "Todo"',
     {
-      name: "trigger",
-      type: "object",
-      properties: [{ name: "type", type: "string" }],
+      or: [
+        "priority >= 2",
+        'file.hasTag("urgent")',
+      ],
     },
   ],
 });
 
-const completions = toCodeMirrorCompletions(
-  completeExpression("file.pa", 7),
-);
+const context = createEvaluationContext({
+  note: { status: "Todo", priority: 1 },
+  file: { path: "Tasks/A.md", tags: ["urgent"] },
+});
+
+const matches = filter.evaluateToBoolean(context);
 ```
 
-Useful public surfaces:
+Filter objects accept exactly one of `and`, `or`, or `not`. A `not` list is treated as `not(and(...))`.
 
-- `createEvaluationContext()` and `createContextFromRow()` normalize row/file/link/frontmatter inputs without importing Obsidian.
-- `objects` on an evaluation context supplies named host objects for workflow events, canvas zones, action results, or other plugin-owned data.
-- `compileExpression()` parses once, exposes dependencies, and evaluates repeatedly.
-- `compileFilter()` and `evaluateFilter()` evaluate Obsidian Bases-style filter trees that contain expression strings plus `and`, `or`, and `not`.
-- `inferDefaultsFromExpression()` and `inferDefaultsFromFilter()` infer only safe note-creation defaults, currently equality constraints and positive `file.hasTag(...)` requirements; unsupported branches are reported explicitly.
-- `evaluateBatch()` evaluates one expression across many rows.
-- `compileFormulaSet()` parses a formula graph, reports formula dependencies, and evaluates the set with shared formula caching.
-- `FormulaLanguageSchema.objects` describes host object roots so completions, hovers, type checks, and dependency reporting distinguish `trigger.zone.id` from note frontmatter.
-- `validateExpressionDetailed()` returns diagnostics plus dependency information suitable for plugin settings screens, workflow editors, active-zone editors, and CI-style checks.
-- `getHoverInfo()`, `getSignatureHelp()`, `completeExpression()`, `toCodeMirrorCompletions()`, and `toCodeMirrorDiagnostics()` provide editor integration primitives.
-- `compatibilityProfile` exposes the oracle case count, generated timestamp, Obsidian version/build metadata when available, docs sources, and known divergences as machine-readable data.
+## Language Tooling
 
-See `examples/` for workflow validation, workflow event contexts, active-zone predicates, settings autocomplete, note-default inference, and batch row filtering.
+The language-service helpers are designed for editors and settings screens. They return plain data rather than rendering UI.
 
-## Known compatibility notes
+```ts
+import {
+  completeExpression,
+  toCodeMirrorCompletions,
+  validateExpressionDetailed,
+  type FormulaLanguageSchema,
+} from "obsidian-bases-expression";
 
-The test suite currently validates 281 expression cases against live Obsidian Bases. Eight known divergences are recorded in the generated fixtures:
+const schema: FormulaLanguageSchema = {
+  properties: [
+    { name: "status", type: "string" },
+    { name: "priority", type: "number" },
+    { name: "due", type: "date" },
+  ],
+  objects: [
+    {
+      name: "trigger",
+      type: "object",
+      properties: [
+        { name: "type", type: "string" },
+        {
+          name: "zone",
+          type: "object",
+          properties: [{ name: "id", type: "string" }],
+        },
+      ],
+    },
+  ],
+};
 
-- Object literals are described in the public docs, but the current parser observed through Obsidian rejects object literal syntax such as `{"a": 1}.keys()`. The package implements object literals because they are documented, and the oracle suite records this as a known divergence instead of hiding it.
-- Public docs show direct numeric method calls such as `1.isTruthy()`, but the current parser rejects direct numeric member syntax. Parenthesized numeric literals such as `(1).isTruthy()` work and are oracle-checked.
-- Unary plus is implemented in the package because it is JavaScript-like and harmless, but the current parser rejects `+value`.
-- Date subtraction is documented as returning a millisecond difference, but live Obsidian currently returns a `Duration` value. The package follows live behavior here because duration values compose with the documented duration methods and stringification.
+const validation = validateExpressionDetailed(
+  'status == "Todo" && trigger.zone.id == "doing"',
+  schema,
+);
 
-## Oracle fixtures
+const completions = toCodeMirrorCompletions(
+  completeExpression("trigger.zone.", "trigger.zone.".length, schema),
+);
 
-With Obsidian running and the CLI connected:
+console.log(validation.dependencies, completions);
+```
+
+Available tooling includes:
+
+- `validateExpression()` and `validateExpressionDetailed()`
+- `inspectExpression()` and `getExpressionDependencies()`
+- `completeExpression()`
+- `getHoverInfo()`
+- `getSignatureHelp()`
+- `toCodeMirrorCompletions()`
+- `toCodeMirrorDiagnostics()`
+
+These APIs are enough for consumers to build their own expression editors or filter builders, but this package intentionally does not include one.
+
+## Note-Creation Defaults
+
+When a UI creates a note from inside a filtered view, it often needs to prefill properties so the new note is not immediately filtered out. `inferDefaultsFromFilter()` handles the safe subset of that problem:
+
+```ts
+import { inferDefaultsFromFilter } from "obsidian-bases-expression";
+
+const inferred = inferDefaultsFromFilter({
+  and: [
+    'status == "Todo"',
+    'note.project == "Client A"',
+    'file.hasTag("work")',
+  ],
+});
+
+console.log(inferred.properties);
+// { status: "Todo", project: "Client A" }
+
+console.log(inferred.tags);
+// ["work"]
+```
+
+Inference is intentionally conservative. Equality checks and positive tag requirements can become defaults. Ranges, negation, `or` branches, arbitrary function calls, and conflicting constraints are reported in `unsupported` instead of being guessed.
+
+## Public API Map
+
+Use these entry points for most integrations:
+
+- `parseExpression()` for syntax trees.
+- `evaluateExpression()`, `evaluateToPlain()`, and `evaluateToString()` for direct evaluation.
+- `compileExpression()` for parse-once/evaluate-many workflows.
+- `createEvaluationContext()` and `createContextFromRow()` for normalized inputs.
+- `compileFilter()` and `evaluateFilter()` for Bases-style filter trees.
+- `compileFormulaSet()` for formula graphs with dependency ordering and shared formula caching.
+- `inferDefaultsFromExpression()` and `inferDefaultsFromFilter()` for note-creation defaults.
+- `createFormulaLanguageService()` for a schema-bound helper object.
+- `compatibilityProfile` for machine-readable compatibility metadata.
+
+See `examples/` for active-zone predicates, workflow condition validation, settings autocomplete, batch row filtering, workflow event contexts, and note-default inference.
+
+## Compatibility
+
+The implementation is based on the public Obsidian Bases documentation and checked against observed app behavior:
+
+- <https://help.obsidian.md/bases/syntax>
+- <https://help.obsidian.md/bases/functions>
+- <https://help.obsidian.md/formulas>
+
+The runtime does not import Obsidian and does not use private Obsidian APIs.
+
+Compatibility is checked separately through an oracle generator in `scripts/`. With Obsidian running and the CLI connected:
 
 ```bash
 npm run oracle:generate
 npm test
 ```
 
-The oracle script creates temporary files in the `test` vault, opens a visible scratch `.base` file in a normal Obsidian leaf, evaluates formulas using Obsidian's live Bases engine, writes `test/fixtures/oracle.generated.json`, and removes the temporary files.
+The generated oracle fixture currently covers 281 live Obsidian cases, including literals, operators, functions, formulas, files, links, frontmatter links, relative markdown links, backlinks, duplicate basenames, and representative runtime errors.
 
-The oracle includes a dedicated link matrix with multiple temporary notes, duplicate basenames, frontmatter wikilinks, wikilink aliases, markdown links, relative markdown paths, markdown image embeds, heading and block subpaths, duplicate headings and block IDs, unresolved links, multiple backlink sources, spaced and unicode/punctuation-heavy names, case-insensitive lookup probes, non-markdown attachments, and full-path variants.
+Known differences from the currently observed Obsidian runtime are recorded in `compatibilityProfile` and in the generated oracle fixture. Where docs and runtime disagree, this package defaults to runtime behavior. See [docs/compatibility.md](docs/compatibility.md) for details.
 
-The oracle script does inspect the live scratch Base controller to find Obsidian's formula/context constructors. That code is deliberately quarantined in `scripts/` and is not imported by the library.
+## Development
+
+```bash
+npm install
+npm run verify
+npm run docs:upstream:check
+npm pack --dry-run
+```
+
+`npm run verify` runs TypeScript, the unit/property/oracle fixture tests, and the build.

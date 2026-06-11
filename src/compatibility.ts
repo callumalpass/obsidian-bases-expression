@@ -27,7 +27,7 @@ export const compatibilityProfile: CompatibilityProfile = {
   oracle: {
     generatedAt: "2026-06-10T07:17:08.362Z",
     caseCount: 281,
-    knownDivergenceCount: 8,
+    knownDivergenceCount: 5,
     obsidianVersion: null,
     obsidianBuild: null,
     repeatedAcrossObsidianVersions: false,
@@ -57,18 +57,6 @@ export const compatibilityProfile: CompatibilityProfile = {
     {
       caseName: "number isEmpty false direct literal",
       behavior: "Public docs show direct numeric method syntax, but the current internal parser rejects it; parenthesized numeric literals work.",
-    },
-    {
-      caseName: "object keys",
-      behavior: "Public docs describe object literals, but the current internal parser rejects them.",
-    },
-    {
-      caseName: "object values",
-      behavior: "Public docs describe object literals, but the current internal parser rejects them.",
-    },
-    {
-      caseName: "object isEmpty",
-      behavior: "Public docs describe object literals, but the current internal parser rejects them.",
     },
   ],
   notes: [
