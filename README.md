@@ -136,6 +136,39 @@ evaluateToPlain(
 
 Reserved roots such as `file`, `note`, `formula`, `this`, and `values` keep their Bases meaning.
 
+For an mdbase v0.3 query adapter, pass `thisRecord` to bind the complete
+portable invocation context. It exposes effective fields at `this.<field>`,
+the `this.record`/`this.note` aliases, persisted `this.raw` values, effective
+and raw presence maps, and `this.file`. Pass `null` explicitly when the query
+has no invocation context; the existing `this.file` fallback remains the
+default for ordinary Obsidian Bases evaluation.
+
+```ts
+const context = createEvaluationContext({
+  note: candidateFrontmatter,
+  file: { path: candidatePath },
+  thisRecord: project
+    ? {
+        record: project.effective,
+        raw: project.raw,
+        knownFields: project.knownFields,
+        file: { path: project.path },
+      }
+    : null,
+});
+```
+
+The package also exposes `convertObsidianBaseToMdbaseView()` and
+`translateObsidianExpressionToMdbase()` for importing `.base` data into the
+canonical mdbase v0.3 view-record shape. The converter maps global filters into
+the nested shared `query`, formulas into projections, column order into
+selection, sorting/grouping/summaries into their query equivalents, and the
+renderer into advisory presentation metadata. It returns an executable
+`record` only when every expression has a behavior-preserving translation;
+otherwise `record` is null, diagnostics identify the unsupported dialect
+features, and an inspectable `draft` retains the lossless source under
+`x-obsidian`.
+
 ## Structured Filters
 
 Bases filters are either expression strings or recursive filter objects. `compileFilter()` evaluates that shape directly:

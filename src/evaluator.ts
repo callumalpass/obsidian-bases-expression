@@ -34,6 +34,12 @@ export interface EvaluationContext {
   objects?: Record<string, unknown>;
   file?: Partial<FileValueInput> & { path?: string };
   thisFile?: Partial<FileValueInput> & { path?: string };
+  /**
+   * Portable mdbase query invocation context. When supplied, this replaces
+   * the Obsidian-compatible `this.file` fallback with the complete mdbase
+   * `this` record contract. An explicit null keeps `this` null.
+   */
+  thisRecord?: MdbaseThisRecordInput | null;
   files?: FileValueInput[];
   linkResolutions?: Record<string, string | null>;
   formulas?: Record<string, string | Expression>;
@@ -41,6 +47,13 @@ export interface EvaluationContext {
   now?: Date | string | number;
   random?: () => number;
   functions?: Record<string, (...args: RuntimeValue[]) => RuntimeValue>;
+}
+
+export interface MdbaseThisRecordInput {
+  record: Record<string, unknown>;
+  raw?: Record<string, unknown>;
+  knownFields?: Iterable<string>;
+  file?: Partial<FileValueInput> & { path?: string };
 }
 
 export interface EvaluationResult {
@@ -115,7 +128,10 @@ export class Evaluator {
     if (Object.prototype.hasOwnProperty.call(scope, name)) return scope[name]!;
     if (name === "note") return this.noteObject();
     if (name === "file") return this.fileObject(this.context.file);
-    if (name === "this") return objectValue({ file: this.fileObject(this.context.thisFile ?? this.context.file) });
+    if (name === "this") {
+      if (this.context.thisRecord !== undefined) return this.mdbaseThisObject(this.context.thisRecord);
+      return objectValue({ file: this.fileObject(this.context.thisFile ?? this.context.file) });
+    }
     if (name === "formula") return objectValue({});
     if (name === "values") return this.noteProperty("values");
     const objects = this.context.objects ?? {};
@@ -571,6 +587,37 @@ export class Evaluator {
       return value.type === "Link" ? value : this.makeLink(stringifyValue(value));
     }
     return fromJs(raw, this.context.propertyTypes?.[name]);
+  }
+
+  private mdbaseThisObject(input: MdbaseThisRecordInput | null): RuntimeValue {
+    if (input === null) return nullValue();
+
+    const record = input.record;
+    const raw = input.raw ?? record;
+    const knownFields = new Set([
+      ...Object.keys(record),
+      ...Object.keys(raw),
+      ...(input.knownFields ?? []),
+    ]);
+    const presentRecord: Record<string, boolean> = {};
+    const presentRaw: Record<string, boolean> = {};
+    for (const field of knownFields) {
+      presentRecord[field] = Object.prototype.hasOwnProperty.call(record, field);
+      presentRaw[field] = Object.prototype.hasOwnProperty.call(raw, field);
+    }
+
+    const values: Record<string, RuntimeValue> = {};
+    for (const [field, value] of Object.entries(record)) values[field] = fromJs(value);
+    values.record = fromJs(record);
+    values.note = fromJs(record);
+    values.raw = fromJs(raw);
+    values.present = fromJs({ record: presentRecord, raw: presentRaw });
+    values.file = this.fileObject({
+      ...(input.file ?? {}),
+      path: input.file?.path ?? "",
+      properties: input.file?.properties ?? record,
+    });
+    return objectValue(values);
   }
 
   private fileObject(file: EvaluationContext["file"]): RuntimeValue {

@@ -50,7 +50,7 @@ export type {
   PropertyValueType,
 } from "./context.js";
 export { evaluateExpression, Evaluator } from "./evaluator.js";
-export type { EvaluationContext, EvaluationResult } from "./evaluator.js";
+export type { EvaluationContext, EvaluationResult, MdbaseThisRecordInput } from "./evaluator.js";
 export {
   addDuration,
   boolValue,
@@ -132,6 +132,18 @@ export type {
 } from "./language-service.js";
 export { compatibilityProfile } from "./compatibility.js";
 export type { CompatibilityProfile, KnownDivergence } from "./compatibility.js";
+export {
+  convertObsidianBaseToMdbaseView,
+  translateObsidianExpressionToMdbase,
+} from "./mdbase.js";
+export type {
+  MdbaseCompatibilityDiagnostic,
+  MdbaseExpressionTranslation,
+  MdbaseViewConversion,
+  MdbaseViewConversionOptions,
+  ObsidianBaseFilter,
+  ObsidianBaseLike,
+} from "./mdbase.js";
 export {
   allFunctionMetadata,
   filePropertyMetadata as builtinFileProperties,

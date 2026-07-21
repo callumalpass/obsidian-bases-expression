@@ -1,6 +1,6 @@
 {
   "name": "obsidian-bases-expression",
-  "version": "0.2.0",
+  "version": "0.3.0-rc.1",
   "description": "Standalone parser, evaluator, diagnostics, and editor tooling for Obsidian Bases-compatible expressions.",
   "type": "module",
   "license": "MIT",

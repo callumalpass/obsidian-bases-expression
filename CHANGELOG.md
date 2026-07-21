@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added an explicit mdbase v0.3 `thisRecord` context with effective, raw,
+  presence, and file namespaces while retaining Obsidian's `this.file`
+  fallback for ordinary Bases evaluation.
+- Added conservative `.base`-to-mdbase view conversion. Portable filters,
+  formulas, columns, sorting, grouping, summaries, and presentation metadata
+  are mapped structurally; behavior-changing dialect features produce explicit
+  diagnostics and retain their source under `x-obsidian`.
+
 ## 0.2.0 - 2026-06-11
 
 ### Added
