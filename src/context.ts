@@ -1,5 +1,5 @@
 import type { Expression } from "./ast.js";
-import type { EvaluationContext } from "./evaluator.js";
+import type { EvaluationContext, MdbaseThisRecordInput } from "./evaluator.js";
 import { fromJs, linkValue, type FileValueInput, type LinkValueInput, type RuntimeValue } from "./value.js";
 
 export type PropertyValueType = NonNullable<EvaluationContext["propertyTypes"]>[string];
@@ -21,6 +21,7 @@ export interface EvaluationContextInput {
   propertyTypes?: Record<string, PropertyValueType>;
   file?: Partial<ContextFileInput> & { path?: string };
   thisFile?: Partial<ContextFileInput> & { path?: string };
+  thisRecord?: MdbaseThisRecordInput | null;
   files?: ContextFileInput[];
   links?: LinkValueInput[];
   embeds?: LinkValueInput[];
@@ -80,6 +81,7 @@ export function createEvaluationContext(input: EvaluationContextInput = {}): Eva
   };
   if (input.objects) context.objects = input.objects;
   if (thisFile) context.thisFile = thisFile;
+  if (input.thisRecord !== undefined) context.thisRecord = input.thisRecord;
   if (input.formulas) context.formulas = input.formulas;
   if (input.propertyTypes) context.propertyTypes = input.propertyTypes;
   if (input.now !== undefined) context.now = input.now;

@@ -79,6 +79,46 @@ describe("high-level evaluation API", () => {
 });
 
 describe("context builders", () => {
+  it("exposes the complete portable mdbase this-record contract", () => {
+    const context = createEvaluationContext({
+      note: { status: "candidate" },
+      file: { path: "Tasks/Candidate.md" },
+      thisRecord: {
+        record: {
+          status: "context",
+          defaulted: "effective default",
+          record: "frontmatter collision",
+        },
+        raw: {
+          status: "context",
+          record: "frontmatter collision",
+        },
+        knownFields: ["status", "defaulted", "missing"],
+        file: { path: "Projects/Alpha.md" },
+      },
+    });
+
+    expect(evaluateToPlain("this.status", context)).toBe("context");
+    expect(evaluateToPlain("this.record.status", context)).toBe("context");
+    expect(evaluateToPlain("this.note.defaulted", context)).toBe("effective default");
+    expect(evaluateToPlain("this.raw.defaulted == null", context)).toBe(true);
+    expect(evaluateToPlain("this.present.record.defaulted", context)).toBe(true);
+    expect(evaluateToPlain("this.present.raw.defaulted", context)).toBe(false);
+    expect(evaluateToPlain("this.present.record.missing", context)).toBe(false);
+    expect(evaluateToPlain("this.file.path", context)).toBe("Projects/Alpha.md");
+    expect(evaluateToPlain("this.record.record", context)).toBe("frontmatter collision");
+  });
+
+  it("keeps an explicitly absent mdbase invocation context null", () => {
+    const context = createEvaluationContext({
+      note: { status: "candidate" },
+      file: { path: "Tasks/Candidate.md" },
+      thisRecord: null,
+    });
+    expect(evaluateToPlain("this == null", context)).toBe(true);
+    expect(evaluateToPlain("this.file.path == null", context)).toBe(true);
+  });
+
   it("normalizes frontmatter links and link resolution maps", () => {
     const context = createEvaluationContext({
       note: { target: "[[Other|Alias]]" },

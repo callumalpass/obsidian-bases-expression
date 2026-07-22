@@ -1,6 +1,6 @@
 {
   "name": "obsidian-bases-expression",
-  "version": "0.2.0",
+  "version": "0.3.0-rc.1",
   "description": "Standalone parser, evaluator, diagnostics, and editor tooling for Obsidian Bases-compatible expressions.",
   "type": "module",
   "license": "MIT",
@@ -48,6 +48,7 @@
     "docs:upstream:update": "node scripts/check-obsidian-docs.mjs --update",
     "oracle:diagnostics:generate": "node scripts/generate-diagnostic-fixtures.mjs",
     "oracle:generate": "node scripts/generate-oracle-fixtures.mjs",
+    "oracle:compact": "node scripts/compact-oracle-fixture.mjs",
     "verify": "npm run check && npm run check:builder && npm run check:dummy && npm test && npm run build:all"
   },
   "dependencies": {
