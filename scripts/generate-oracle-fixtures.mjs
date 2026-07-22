@@ -337,6 +337,7 @@ const cases = [
 
 const context = {
   now: "2026-06-10T12:34:56",
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   note: {
     price: 12.5,
     quantity: 4,
