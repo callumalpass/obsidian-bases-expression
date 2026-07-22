@@ -48,6 +48,7 @@
     "docs:upstream:update": "node scripts/check-obsidian-docs.mjs --update",
     "oracle:diagnostics:generate": "node scripts/generate-diagnostic-fixtures.mjs",
     "oracle:generate": "node scripts/generate-oracle-fixtures.mjs",
+    "oracle:compact": "node scripts/compact-oracle-fixture.mjs",
     "verify": "npm run check && npm run check:builder && npm run check:dummy && npm test && npm run build:all"
   },
   "dependencies": {
