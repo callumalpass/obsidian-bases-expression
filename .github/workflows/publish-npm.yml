@@ -3,6 +3,9 @@ name: Publish npm package
 on:
   release:
     types: [published]
+  push:
+    tags:
+      - "builder-v*"
 
 permissions:
   contents: read
@@ -13,7 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: npm
-      url: https://www.npmjs.com/package/obsidian-bases-expression
     permissions:
       contents: read
       id-token: write
@@ -22,7 +24,7 @@ jobs:
       - name: Checkout release
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || github.ref_name }}
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -37,10 +39,20 @@ jobs:
       - name: Validate release metadata
         id: release
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          VERSION="$(node --print "require('./package.json').version")"
-          EXPECTED_TAG="v${VERSION}"
+          if [ "$EVENT_NAME" = "release" ]; then
+            PACKAGE_DIR="."
+            EXPECTED_PREFIX="v"
+          else
+            PACKAGE_DIR="packages/obsidian"
+            EXPECTED_PREFIX="builder-v"
+          fi
+
+          VERSION="$(node --print "require('./${PACKAGE_DIR}/package.json').version")"
+          PACKAGE_NAME="$(node --print "require('./${PACKAGE_DIR}/package.json').name")"
+          EXPECTED_TAG="${EXPECTED_PREFIX}${VERSION}"
 
           if [ "$RELEASE_TAG" != "$EXPECTED_TAG" ]; then
             echo "::error::Release tag $RELEASE_TAG does not match package version $EXPECTED_TAG"
@@ -52,6 +64,8 @@ jobs:
             *) DIST_TAG="latest" ;;
           esac
 
+          echo "package_dir=$PACKAGE_DIR" >> "$GITHUB_OUTPUT"
+          echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
 
@@ -63,14 +77,16 @@ jobs:
 
       - name: Confirm version is unpublished
         env:
+          PACKAGE_NAME: ${{ steps.release.outputs.package_name }}
           VERSION: ${{ steps.release.outputs.version }}
         run: |
-          if npm view "obsidian-bases-expression@$VERSION" version >/dev/null 2>&1; then
-            echo "::error::obsidian-bases-expression@$VERSION is already published"
+          if npm view "$PACKAGE_NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "::error::$PACKAGE_NAME@$VERSION is already published"
             exit 1
           fi
 
       - name: Publish package
         env:
           DIST_TAG: ${{ steps.release.outputs.dist_tag }}
-        run: npm publish --access public --tag "$DIST_TAG"
+          PACKAGE_DIR: ${{ steps.release.outputs.package_dir }}
+        run: npm publish "$PACKAGE_DIR" --access public --tag "$DIST_TAG"

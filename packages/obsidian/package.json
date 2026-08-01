@@ -4,6 +4,11 @@
   "description": "Native Obsidian UI helpers for building, validating, and editing Obsidian Bases-compatible expressions.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/callumalpass/obsidian-bases-expression.git",
+    "directory": "packages/obsidian"
+  },
   "keywords": [
     "obsidian",
     "bases",
