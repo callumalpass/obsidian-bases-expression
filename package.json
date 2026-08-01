@@ -2,6 +2,10 @@
   "name": "obsidian-bases-expression",
   "version": "0.3.0-rc.1",
   "description": "Standalone parser, evaluator, diagnostics, and editor tooling for Obsidian Bases-compatible expressions.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/callumalpass/obsidian-bases-expression.git"
+  },
   "type": "module",
   "license": "MIT",
   "workspaces": [
