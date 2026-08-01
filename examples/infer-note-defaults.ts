@@ -8,6 +8,7 @@ const viewFilter = {
   and: [
     'status == "Todo"',
     'note.project == "Client A"',
+    'list(note.reviewers).contains("Alice")',
     'file.hasTag("work")',
   ],
 };

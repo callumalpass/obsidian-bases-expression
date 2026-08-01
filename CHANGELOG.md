@@ -4,6 +4,14 @@
 
 ### Added
 
+- Extended conservative note-creation inference with explicit-list and
+  schema-aware `contains()` defaults, caller-resolved `this.file.asLink()`
+  values, bracket property names, and narrowly recognized link-preserving maps
+  used by generated relationship filters. Arbitrary maps, unresolved current
+  files, `or` branches, and conflicting constraints remain unsupported.
+- Added adapters for Obsidian Bases view-config filter nodes and a convenience
+  inference entry point that combines query-level and view-level filters while
+  preserving adapter failures as diagnostics.
 - Added an explicit mdbase v0.3 `thisRecord` context with effective, raw,
   presence, and file namespaces while retaining Obsidian's `this.file`
   fallback for ordinary Bases evaluation.
@@ -11,6 +19,11 @@
   formulas, columns, sorting, grouping, summaries, and presentation metadata
   are mapped structurally; behavior-changing dialect features produce explicit
   diagnostics and retain their source under `x-obsidian`.
+
+### Fixed
+
+- Fixed string literals made entirely of punctuation, such as `")"`, being
+  mistaken for parser delimiters inside calls, arrays, and grouped expressions.
 
 ## 0.2.0 - 2026-06-11
 

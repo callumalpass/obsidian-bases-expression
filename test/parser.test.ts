@@ -36,6 +36,19 @@ describe("lexer", () => {
 });
 
 describe("parseExpression", () => {
+  it.each(["(", ")", "[", "]", "{", "}", ",", "."])(
+    "does not treat a %s string literal as punctuation",
+    (value) => {
+      const parsed = parseExpression(`list(note.values).contains(${JSON.stringify(value)})`);
+
+      expect(parsed.diagnostics).toEqual([]);
+      expect(parsed.ast).toMatchObject({
+        type: "Call",
+        args: [{ type: "Literal", value }],
+      });
+    },
+  );
+
   it("parses arithmetic with precedence", () => {
     const parsed = parseExpression("1 + 2 * 3");
     expect(parsed.diagnostics).toEqual([]);

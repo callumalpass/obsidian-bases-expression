@@ -234,8 +234,8 @@ class Parser {
     let depth = 1;
     while (!this.at("eof") && depth > 0) {
       const token = this.advance();
-      if (token.value === "{") depth++;
-      if (token.value === "}") depth--;
+      if (token.type === "punct" && token.value === "{") depth++;
+      if (token.type === "punct" && token.value === "}") depth--;
     }
     const end = this.tokens[Math.max(0, this.i - 1)]?.end ?? open.end;
     this.diagnostics.push({
@@ -260,7 +260,8 @@ class Parser {
   }
 
   private check(value: string): boolean {
-    return this.current().value === value;
+    const token = this.current();
+    return token.type === "punct" && token.value === value;
   }
 
   private at(type: Token["type"]): boolean {
