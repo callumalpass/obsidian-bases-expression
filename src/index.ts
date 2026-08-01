@@ -88,10 +88,17 @@ export type {
   LogicalFilter,
 } from "./filter.js";
 export {
+  adaptObsidianFilterConfig,
+  adaptObsidianFilterNode,
+} from "./filter-adapter.js";
+export type { AdaptedFilterResult } from "./filter-adapter.js";
+export {
   inferDefaultsFromExpression,
   inferDefaultsFromFilter,
+  inferDefaultsFromObsidianFilterConfig,
 } from "./inference.js";
 export type {
+  DefaultInferenceOptions,
   InferredConstraint,
   InferredDefaults,
   UnsupportedConstraint,

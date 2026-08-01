@@ -340,24 +340,74 @@ The package also exports `BasesExpressionBuilder` for embedding in a custom view
 When a UI creates a note from inside a filtered view, it often needs to prefill properties so the new note is not immediately filtered out. `inferDefaultsFromFilter()` handles the safe subset of that problem:
 
 ```ts
-import { inferDefaultsFromFilter } from "obsidian-bases-expression";
+import {
+  inferDefaultsFromFilter,
+  inferDefaultsFromObsidianFilterConfig,
+} from "obsidian-bases-expression";
 
 const inferred = inferDefaultsFromFilter({
   and: [
     'status == "Todo"',
     'note.project == "Client A"',
+    'list(note.reviewers).contains("Alice")',
     'file.hasTag("work")',
   ],
 });
 
 console.log(inferred.properties);
-// { status: "Todo", project: "Client A" }
+// { status: "Todo", project: "Client A", reviewers: ["Alice"] }
 
 console.log(inferred.tags);
 // ["work"]
 ```
 
-Inference is intentionally conservative. Equality checks and positive tag requirements can become defaults. Ranges, negation, `or` branches, arbitrary function calls, and conflicting constraints are reported in `unsupported` instead of being guessed.
+Hosts can resolve current-file relationship filters and declare direct
+`contains()` receiver types through the optional inference context:
+
+```ts
+const inferred = inferDefaultsFromFilter(
+  {
+    and: [
+      'list(note.projects).contains(this.file.asLink())',
+      'note.title.contains("Follow up")',
+    ],
+  },
+  {
+    thisFileLink: "[[Projects/Alpha|Alpha]]",
+    propertyTypes: { title: "string" },
+  },
+);
+
+console.log(inferred.properties);
+// { projects: ["[[Projects/Alpha|Alpha]]"], title: "Follow up" }
+```
+
+Explicit `list(property).contains(value)` constraints produce list defaults.
+Direct `property.contains(value)` constraints require a `string` or `list`
+entry in `propertyTypes` so inference does not guess the stored property type.
+The current-file value is never synthesized; callers must supply the concrete
+frontmatter value through `thisFileLink`.
+
+Inference recognizes the link-preserving `file(value).asLink()` maps and the
+markdown-link and object-UID normalizers emitted by generated relationship
+filters. Other maps remain unsupported. Ranges, negation, `or` branches,
+unresolved symbolic values, arbitrary function calls, and conflicting
+constraints are likewise reported in `unsupported` instead of being guessed.
+
+Obsidian view integrations can pass the runtime config shape directly through
+`inferDefaultsFromObsidianFilterConfig()`. It adapts query-level and view-level
+`conjunction` / `filters` / `rule.text` nodes into the package's structured
+filter representation and returns adapter failures in `diagnostics`:
+
+```ts
+const inferred = inferDefaultsFromObsidianFilterConfig(viewConfig, {
+  thisFileLink: "[[Projects/Alpha|Alpha]]",
+  propertyTypes: { projects: "list" },
+});
+```
+
+Use `adaptObsidianFilterConfig()` or `adaptObsidianFilterNode()` separately
+when the adapted filter is also needed for compilation or evaluation.
 
 ## Public API Map
 
@@ -368,8 +418,11 @@ Use these entry points for most integrations:
 - `compileExpression()` for parse-once/evaluate-many workflows.
 - `createEvaluationContext()` and `createContextFromRow()` for normalized inputs.
 - `compileFilter()` and `evaluateFilter()` for Bases-style filter trees.
+- `adaptObsidianFilterConfig()` and `adaptObsidianFilterNode()` for the filter
+  nodes exposed by Obsidian Bases view configs.
 - `compileFormulaSet()` for formula graphs with dependency ordering and shared formula caching.
-- `inferDefaultsFromExpression()` and `inferDefaultsFromFilter()` for note-creation defaults.
+- `inferDefaultsFromExpression()`, `inferDefaultsFromFilter()`, and
+  `inferDefaultsFromObsidianFilterConfig()` for note-creation defaults.
 - `createFormulaLanguageService()` for a schema-bound helper object.
 - `compatibilityProfile` for machine-readable compatibility metadata.
 
