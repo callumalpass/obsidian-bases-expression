@@ -89,4 +89,4 @@ jobs:
         env:
           DIST_TAG: ${{ steps.release.outputs.dist_tag }}
           PACKAGE_DIR: ${{ steps.release.outputs.package_dir }}
-        run: npm publish "$PACKAGE_DIR" --access public --tag "$DIST_TAG"
+        run: npm publish "./$PACKAGE_DIR" --access public --tag "$DIST_TAG"
