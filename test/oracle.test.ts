@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { evaluateExpression, toPlain } from "../src/index.js";
 
-const fixturePath = new URL("./fixtures/oracle.generated.json", import.meta.url);
+const fixturePath = new URL("./fixtures/oracle.compact.json", import.meta.url);
 
 describe("Obsidian oracle fixtures", () => {
   if (!existsSync(fixturePath)) {
@@ -12,20 +12,22 @@ describe("Obsidian oracle fixtures", () => {
 
   const fixture = JSON.parse(readFileSync(fixturePath, "utf8")) as {
     generatedAt: string;
+    context: Parameters<typeof evaluateExpression>[1] & { timezone?: string };
     cases: Array<{
       name: string;
       expression: string;
-      context: Parameters<typeof evaluateExpression>[1];
       expected: unknown;
       knownDivergence?: string;
       assertion?: "range01";
     }>;
   };
+  const { timezone, ...context } = fixture.context;
+  if (timezone) process.env.TZ = timezone;
 
   for (const testCase of fixture.cases) {
     if (testCase.knownDivergence) {
       it(`records known divergence for ${testCase.name}`, () => {
-        const result = toPlain(evaluateExpression(testCase.expression, testCase.context).value);
+        const result = toPlain(evaluateExpression(testCase.expression, context).value);
         expect(result).not.toEqual(testCase.expected);
         expect(testCase.knownDivergence.length).toBeGreaterThan(0);
       });
@@ -39,7 +41,7 @@ describe("Obsidian oracle fixtures", () => {
         expect(testCase.expected as number).toBeLessThan(1);
         const result = toPlain(
           evaluateExpression(testCase.expression, {
-            ...testCase.context,
+            ...context,
             random: () => testCase.expected as number,
           }).value,
         );
@@ -49,7 +51,7 @@ describe("Obsidian oracle fixtures", () => {
     }
 
     it(`matches Obsidian for ${testCase.name}`, () => {
-      const result = toPlain(evaluateExpression(testCase.expression, testCase.context).value);
+      const result = toPlain(evaluateExpression(testCase.expression, context).value);
       expect(result).toEqual(testCase.expected);
     });
   }

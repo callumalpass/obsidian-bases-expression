@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.3.0-rc.3 - 2026-08-08
+
+### Fixed
+
+- Made Obsidian oracle verification independent of the machine timezone by
+  using the timezone recorded with the compact oracle fixture.
+
 ## 0.3.0-rc.2 - 2026-08-08
 
 ### Added
