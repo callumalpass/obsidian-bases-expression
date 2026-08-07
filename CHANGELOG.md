@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+
+- Aligned the Obsidian builder's CodeMirror peer versions with the current
+  Obsidian SDK so a fresh npm install resolves without peer conflicts.
+
 ## 0.3.0-rc.4 - 2026-08-08
 
 ### Fixed
