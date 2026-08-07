@@ -1,6 +1,6 @@
 {
   "name": "obsidian-bases-expression-builder",
-  "version": "0.1.0",
+  "version": "0.2.0-rc.1",
   "description": "Native Obsidian UI helpers for building, validating, and editing Obsidian Bases-compatible expressions.",
   "type": "module",
   "license": "MIT",
@@ -43,7 +43,7 @@
     "@codemirror/state": "^6.0.0",
     "@codemirror/view": "^6.0.0",
     "obsidian": ">=1.8.0",
-    "obsidian-bases-expression": "^0.3.0-rc.1"
+    "obsidian-bases-expression": "^0.3.0-rc.2"
   },
   "devDependencies": {
     "obsidian-bases-expression": "file:../.."

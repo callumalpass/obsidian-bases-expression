@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.0-rc.2 - 2026-08-08
+
 ### Added
 
 - Extended conservative note-creation inference with explicit-list and
