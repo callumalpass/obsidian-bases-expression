@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.3.0-rc.4 - 2026-08-08
+
+### Fixed
+
+- Made smoke-plugin copying opt-in so package verification has no dependency
+  on a developer-specific Obsidian vault path.
+
 ## 0.3.0-rc.3 - 2026-08-08
 
 ### Fixed

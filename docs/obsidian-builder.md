@@ -74,7 +74,9 @@ Schema collection options that affect suggestions:
 
 ## Smoke Plugin
 
-`examples/dummy-obsidian-plugin` is a real Obsidian plugin that consumes the package. Its build copies `main.js`, `manifest.json`, and `styles.css` into:
+`examples/dummy-obsidian-plugin` is a real Obsidian plugin that consumes the
+package. Set `OBE_SMOKE_PLUGIN_DIR` when its build should also copy `main.js`,
+`manifest.json`, and `styles.css` into a test vault:
 
 ```text
 /home/calluma/testvault/test/.obsidian/plugins/bases-expression-builder-smoke
@@ -84,7 +86,7 @@ Useful local commands:
 
 ```bash
 npm run build:builder
-npm run build:dummy
+OBE_SMOKE_PLUGIN_DIR=/home/calluma/testvault/test/.obsidian/plugins/bases-expression-builder-smoke npm run build:dummy
 obsidian vault=test plugin:reload id=bases-expression-builder-smoke
 obsidian vault=test command id=bases-expression-builder-smoke:open-builder-view
 obsidian vault=test command id=bases-expression-builder-smoke:open-builder-modal

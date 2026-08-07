@@ -43,7 +43,7 @@
     "@codemirror/state": "^6.0.0",
     "@codemirror/view": "^6.0.0",
     "obsidian": ">=1.8.0",
-    "obsidian-bases-expression": "^0.3.0-rc.3"
+    "obsidian-bases-expression": "^0.3.0-rc.4"
   },
   "devDependencies": {
     "obsidian-bases-expression": "file:../.."
