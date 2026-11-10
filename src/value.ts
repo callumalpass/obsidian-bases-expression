@@ -191,7 +191,23 @@ export function errorValue(message: string): RuntimeValue {
   return { type: "Error", value: { message } };
 }
 
+/**
+ * Converts a JavaScript value into a runtime value. Objects and arrays are
+ * converted recursively. Input may be an arbitrary object graph: a reference
+ * back to an object that is still being converted (a cycle) becomes `null`,
+ * and an object reached more than once is converted only once, so conversion
+ * always terminates and is linear in the size of the graph.
+ */
 export function fromJs(value: unknown, typeHint?: string): RuntimeValue {
+  return convertJs(value, typeHint, { converting: new Set(), converted: new Map() });
+}
+
+type ConversionState = {
+  converting: Set<object>;
+  converted: Map<object, RuntimeValue>;
+};
+
+function convertJs(value: unknown, typeHint: string | undefined, state: ConversionState): RuntimeValue {
   if (value && typeof value === "object" && "type" in value && "value" in value) {
     const runtimeValue = value as RuntimeValue;
     if (runtimeValue.type === "Link") {
@@ -207,15 +223,31 @@ export function fromJs(value: unknown, typeHint?: string): RuntimeValue {
   if (typeof value === "boolean") return boolValue(value);
   if (typeof value === "number") return numberValue(value);
   if (typeof value === "string") return stringValue(value);
-  if (Array.isArray(value)) return listValue(value.map((item) => fromJs(item)));
-  if (typeof value === "object") {
-    const out: Record<string, RuntimeValue> = {};
-    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-      out[key] = fromJs(item);
-    }
-    return objectValue(out);
-  }
+  if (typeof value === "object") return convertObject(value, state);
   return stringValue(String(value));
+}
+
+function convertObject(value: object, state: ConversionState): RuntimeValue {
+  const done = state.converted.get(value);
+  if (done) return done;
+  if (state.converting.has(value)) return nullValue();
+  state.converting.add(value);
+  let result: RuntimeValue;
+  try {
+    if (Array.isArray(value)) {
+      result = listValue(value.map((item) => convertJs(item, undefined, state)));
+    } else {
+      const out: Record<string, RuntimeValue> = {};
+      for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+        out[key] = convertJs(item, undefined, state);
+      }
+      result = objectValue(out);
+    }
+  } finally {
+    state.converting.delete(value);
+  }
+  state.converted.set(value, result);
+  return result;
 }
 
 export function toPlain(value: RuntimeValue): unknown {
