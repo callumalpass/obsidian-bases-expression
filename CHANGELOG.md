@@ -4,14 +4,18 @@
 
 ### Fixed
 
+- Aligned the Obsidian builder's CodeMirror peer versions with the current
+  Obsidian SDK so a fresh npm install resolves without peer conflicts.
+
+## 0.3.0-rc.5 - 2026-11-11
+
+### Fixed
+
 - (#7) `fromJs`, and so expression evaluation over context `objects`, no
   longer overflows the stack on circular input such as a task that reaches the
   Obsidian `App`. A reference back to an object that is still being converted
   becomes `null`, and an object reached more than once is converted only once.
   Thanks to @konstantinopolka for reporting this.
-
-- Aligned the Obsidian builder's CodeMirror peer versions with the current
-  Obsidian SDK so a fresh npm install resolves without peer conflicts.
 
 ## 0.3.0-rc.4 - 2026-08-08
 
