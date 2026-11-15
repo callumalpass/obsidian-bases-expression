@@ -1,6 +1,6 @@
 {
   "name": "obsidian-bases-expression",
-  "version": "0.3.0-rc.5",
+  "version": "0.3.0",
   "description": "Standalone parser, evaluator, diagnostics, and editor tooling for Obsidian Bases-compatible expressions.",
   "repository": {
     "type": "git",

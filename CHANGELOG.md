@@ -1,37 +1,6 @@
 # Changelog
 
-## Unreleased
-
-### Fixed
-
-- Aligned the Obsidian builder's CodeMirror peer versions with the current
-  Obsidian SDK so a fresh npm install resolves without peer conflicts.
-
-## 0.3.0-rc.5 - 2026-11-11
-
-### Fixed
-
-- (#7) `fromJs`, and so expression evaluation over context `objects`, no
-  longer overflows the stack on circular input such as a task that reaches the
-  Obsidian `App`. A reference back to an object that is still being converted
-  becomes `null`, and an object reached more than once is converted only once.
-  Thanks to @konstantinopolka for reporting this.
-
-## 0.3.0-rc.4 - 2026-08-08
-
-### Fixed
-
-- Made smoke-plugin copying opt-in so package verification has no dependency
-  on a developer-specific Obsidian vault path.
-
-## 0.3.0-rc.3 - 2026-08-08
-
-### Fixed
-
-- Made Obsidian oracle verification independent of the machine timezone by
-  using the timezone recorded with the compact oracle fixture.
-
-## 0.3.0-rc.2 - 2026-08-08
+## 0.3.0 - 2026-11-15
 
 ### Added
 
@@ -52,6 +21,21 @@
   diagnostics and retain their source under `x-obsidian`.
 
 ### Fixed
+
+- Aligned the Obsidian builder's CodeMirror peer versions with the current
+  Obsidian SDK so a fresh npm install resolves without peer conflicts.
+
+- (#7) `fromJs`, and so expression evaluation over context `objects`, no
+  longer overflows the stack on circular input such as a task that reaches the
+  Obsidian `App`. A reference back to an object that is still being converted
+  becomes `null`, and an object reached more than once is converted only once.
+  Thanks to @konstantinopolka for reporting this.
+
+- Made smoke-plugin copying opt-in so package verification has no dependency
+  on a developer-specific Obsidian vault path.
+
+- Made Obsidian oracle verification independent of the machine timezone by
+  using the timezone recorded with the compact oracle fixture.
 
 - Fixed string literals made entirely of punctuation, such as `")"`, being
   mistaken for parser delimiters inside calls, arrays, and grouped expressions.
